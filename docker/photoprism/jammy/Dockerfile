@@ -9,7 +9,7 @@ WORKDIR "/go/src/github.com/photoprism/photoprism"
 COPY . .
 
 # build and install dist files for prod env
-RUN make all install DESTDIR=/opt/photoprism
+RUN npm config set registry https://registry.npmmirror.com && go env -w GOPROXY=https://goproxy.cn,direct && make all install DESTDIR=/opt/photoprism
 
 ################################################## PRODUCTION STAGE ####################################################
 #### Base Image: Ubuntu 22.04, Codename "Jammy Jellyfish"
