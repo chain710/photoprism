@@ -25,8 +25,8 @@ import (
 var exifIfdMapping *exifcommon.IfdMapping
 var exifTagIndex = exif.NewTagIndex()
 var exifMutex = sync.Mutex{}
-var exifDateTimeTags = []string{"DateTimeOriginal", "DateTimeDigitized", "CreateDate", "DateTime"}
-var exifSubSecTags = []string{"SubSecTimeOriginal", "SubSecTimeDigitized", "SubSecTime"}
+var exifDateTimeTags = []string{"DateTimeOriginal", "DateTimeCreated", "CreateDate", "DateTime", "DateTimeDigitized"}
+var exifSubSecTags = []string{"SubSecTimeOriginal", "SubSecTime", "SubSecTimeDigitized"}
 
 func init() {
 	exifIfdMapping = exifcommon.NewIfdMapping()
@@ -53,6 +53,11 @@ func (data *Data) Exif(fileName string, fileFormat fs.Type, bruteForce bool) (er
 			err = fmt.Errorf("metadata: %s in %s (exif panic)\nstack: %s", e, clean.Log(filepath.Base(fileName)), debug.Stack())
 		}
 	}()
+
+	// Resolve file name e.g. in case it's a symlink.
+	if fileName, err = fs.Resolve(fileName); err != nil {
+		return err
+	}
 
 	// Extract raw Exif block.
 	rawExif, err := RawExif(fileName, fileFormat, bruteForce)

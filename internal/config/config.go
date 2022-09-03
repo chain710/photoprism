@@ -27,6 +27,7 @@ import (
 	"github.com/photoprism/photoprism/internal/face"
 	"github.com/photoprism/photoprism/internal/hub"
 	"github.com/photoprism/photoprism/internal/hub/places"
+	"github.com/photoprism/photoprism/internal/i18n"
 	"github.com/photoprism/photoprism/internal/mutex"
 	"github.com/photoprism/photoprism/internal/thumb"
 	"github.com/photoprism/photoprism/pkg/clean"
@@ -61,8 +62,8 @@ func init() {
 	}
 
 	// Init public thumb sizes for use in client apps.
-	for i := len(thumb.DefaultSizes) - 1; i >= 0; i-- {
-		name := thumb.DefaultSizes[i]
+	for i := len(thumb.Names) - 1; i >= 0; i-- {
+		name := thumb.Names[i]
 		t := thumb.Sizes[name]
 
 		if t.Public {
@@ -109,6 +110,15 @@ func NewConfig(ctx *cli.Context) *Config {
 		}
 	}
 
+	// Initialize package extensions.
+	for _, ext := range Extensions() {
+		if err := ext.init(c); err != nil {
+			log.Warnf("config: failed to initialize extension %s (%s)", clean.Log(ext.name), err)
+		} else {
+			log.Debugf("config: extension %s initialized", clean.Log(ext.name))
+		}
+	}
+
 	return c
 }
 
@@ -142,7 +152,7 @@ func (c *Config) Propagate() {
 	places.UserAgent = c.UserAgent()
 	entity.GeoApi = c.GeoApi()
 
-	// Set facial recognition parameters.
+	// Set face recognition parameters.
 	face.ScoreThreshold = c.FaceScore()
 	face.OverlapThreshold = c.FaceOverlap()
 	face.ClusterScoreThreshold = c.FaceClusterScore()
@@ -165,12 +175,6 @@ func (c *Config) Init() error {
 
 	if err := c.initSerial(); err != nil {
 		return err
-	}
-
-	// Show funding info?
-	if !c.Sponsor() {
-		log.Info(MsgSponsor)
-		log.Info(MsgSignUp)
 	}
 
 	if insensitive, err := c.CaseInsensitive(); err != nil {
@@ -214,13 +218,16 @@ func (c *Config) Init() error {
 
 	c.Propagate()
 
-	err := c.connectDb()
-
-	if err == nil {
-		log.Debugf("config: successfully initialized [%s]", time.Since(start))
+	if err := c.connectDb(); err != nil {
+		return err
+	} else if !c.Sponsor() {
+		log.Info(MsgSponsor)
+		log.Info(MsgSignUp)
 	}
 
-	return err
+	log.Debugf("config: successfully initialized [%s]", time.Since(start))
+
+	return nil
 }
 
 // readSerial reads and returns the current storage serial.
@@ -409,7 +416,7 @@ func (c *Config) SiteDescription() string {
 
 // SitePreview returns the site preview image URL for sharing.
 func (c *Config) SitePreview() string {
-	if c.options.SitePreview == "" {
+	if c.options.SitePreview == "" || c.NoSponsor() {
 		return c.SiteUrl() + "static/img/preview.jpg"
 	}
 
@@ -438,9 +445,16 @@ func (c *Config) ImprintUrl() string {
 	return c.options.ImprintUrl
 }
 
+// Prod checks if production mode is enabled, hides non-essential log messages.
+func (c *Config) Prod() bool {
+	return c.options.Prod
+}
+
 // Debug checks if debug mode is enabled, shows non-essential log messages.
 func (c *Config) Debug() bool {
-	if c.Trace() {
+	if c.Prod() {
+		return false
+	} else if c.Trace() {
 		return true
 	}
 
@@ -449,7 +463,11 @@ func (c *Config) Debug() bool {
 
 // Trace checks if trace mode is enabled, shows all log messages.
 func (c *Config) Trace() bool {
-	return c.options.Trace
+	if c.Prod() {
+		return false
+	}
+
+	return c.options.Trace || c.options.LogLevel == logrus.TraceLevel.String()
 }
 
 // Test checks if test mode is enabled.
@@ -462,32 +480,20 @@ func (c *Config) Demo() bool {
 	return c.options.Demo
 }
 
-// Sponsor reports if your continuous support helps to pay for development and operating expenses.
+// Sponsor reports if you have chosen to support our mission.
 func (c *Config) Sponsor() bool {
-	return c.options.Sponsor || c.Test()
+	if Sponsor || c.options.Sponsor {
+		return true
+	} else if c.hub != nil {
+		Sponsor = c.Hub().Plus()
+	}
+
+	return Sponsor
 }
 
-// NoSponsor reports if the instance is not operated by a sponsor.
+// NoSponsor reports if you prefer not to support our mission.
 func (c *Config) NoSponsor() bool {
 	return !c.Sponsor() && !c.Demo()
-}
-
-// Public checks if app runs in public mode and requires no authentication.
-func (c *Config) Public() bool {
-	if c.Auth() {
-		return false
-	} else if c.Demo() {
-		return true
-	}
-
-	return c.options.Public
-}
-
-// SetPublic changes authentication while instance is running, for testing purposes only.
-func (c *Config) SetPublic(p bool) {
-	if c.Debug() {
-		c.options.Public = p
-	}
 }
 
 // Experimental checks if experimental features should be enabled.
@@ -508,16 +514,6 @@ func (c *Config) DetectNSFW() bool {
 // UploadNSFW checks if NSFW photos can be uploaded.
 func (c *Config) UploadNSFW() bool {
 	return c.options.UploadNSFW
-}
-
-// AdminPassword returns the initial admin password.
-func (c *Config) AdminPassword() string {
-	return c.options.AdminPassword
-}
-
-// Auth checks if authentication is always required.
-func (c *Config) Auth() bool {
-	return c.options.Auth
 }
 
 // LogLevel returns the Logrus log level.
@@ -673,6 +669,10 @@ func (c *Config) OriginalsLimitBytes() int64 {
 
 // ResolutionLimit returns the maximum resolution of originals in megapixels (width x height).
 func (c *Config) ResolutionLimit() int {
+	if c.NoSponsor() {
+		return 100
+	}
+
 	result := c.options.ResolutionLimit
 
 	if result <= 0 {
@@ -684,31 +684,41 @@ func (c *Config) ResolutionLimit() int {
 	return result
 }
 
-// UpdateHub updates backend api credentials for maps & places.
+// UpdateHub renews backend api credentials for maps & places without a token.
 func (c *Config) UpdateHub() {
-	if err := c.hub.Refresh(); err != nil {
-		log.Debugf("config: %s", err)
-	} else if err := c.hub.Save(); err != nil {
-		log.Debugf("config: %s", err)
+	_ = c.ResyncHub("")
+}
+
+// ResyncHub renews backend api credentials for maps & places with an optional token.
+func (c *Config) ResyncHub(token string) error {
+	if err := c.hub.Resync(token); err != nil {
+		log.Debugf("config: %s (refresh backend api tokens)", err)
+		if token != "" {
+			return i18n.Error(i18n.ErrAccountConnect)
+		}
+	} else if err = c.hub.Save(); err != nil {
+		log.Debugf("config: %s (save backend api tokens)", err)
 	} else {
 		c.hub.Propagate()
 	}
+
+	return nil
 }
 
 // initHub initializes PhotoPrism hub config.
 func (c *Config) initHub() {
 	if c.hub != nil {
 		return
+	} else if h := hub.NewConfig(c.Version(), c.HubConfigFile(), c.serial, c.env, c.UserAgent(), c.options.PartnerID); h != nil {
+		c.hub = h
 	}
-
-	c.hub = hub.NewConfig(c.Version(), c.HubConfigFile(), c.serial, c.env, c.UserAgent(), c.options.PartnerID)
 
 	if err := c.hub.Load(); err == nil {
 		// Do nothing.
-	} else if err := c.hub.Refresh(); err != nil {
-		log.Debugf("config: %s", err)
+	} else if err := c.hub.Update(); err != nil {
+		log.Debugf("config: %s (init backend api tokens)", err)
 	} else if err := c.hub.Save(); err != nil {
-		log.Debugf("config: %s", err)
+		log.Debugf("config: %s (save backend api tokens)", err)
 	}
 
 	c.hub.Propagate()

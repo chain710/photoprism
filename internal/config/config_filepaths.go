@@ -2,10 +2,12 @@ package config
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"os/user"
 	"path/filepath"
+	"runtime"
 
 	"github.com/photoprism/photoprism/pkg/clean"
 	"github.com/photoprism/photoprism/pkg/fs"
@@ -13,6 +15,7 @@ import (
 
 // binPaths stores known executable paths.
 var binPaths = make(map[string]string, 8)
+var tempPath = ""
 
 // findExecutable searches binaries by their name.
 func findExecutable(configBin, defaultBin string) (binPath string) {
@@ -238,6 +241,11 @@ func (c *Config) OriginalsPath() string {
 	return fs.Abs(c.options.OriginalsPath)
 }
 
+// OriginalsDeletable checks if originals can be deleted.
+func (c *Config) OriginalsDeletable() bool {
+	return !c.ReadOnly() && fs.Writable(c.OriginalsPath()) && c.Settings().Features.Delete
+}
+
 // ImportPath returns the import directory.
 func (c *Config) ImportPath() string {
 	if c.options.ImportPath == "" {
@@ -267,19 +275,64 @@ func (c *Config) SidecarWritable() bool {
 	return !c.ReadOnly() || c.SidecarPathIsAbs()
 }
 
-// TempPath returns a temporary directory name for uploads and downloads.
+// TempPath returns the cached temporary directory name e.g. for uploads and downloads.
 func (c *Config) TempPath() string {
-	if c.options.TempPath != "" {
-		if c.options.TempPath[0] != '/' {
-			c.options.TempPath = fs.Abs(c.options.TempPath)
-		}
-	} else if dir, err := os.MkdirTemp(os.TempDir(), "photoprism"); err == nil {
-		c.options.TempPath = dir
-	} else {
-		c.options.TempPath = filepath.Join(os.TempDir(), "photoprism")
+	// Return cached value?
+	if tempPath == "" {
+		tempPath = c.tempPath()
 	}
 
-	return c.options.TempPath
+	return tempPath
+}
+
+// tempPath determines the temporary directory name e.g. for uploads and downloads.
+func (c *Config) tempPath() string {
+	osTempDir := os.TempDir()
+
+	// Empty default?
+	if osTempDir == "" {
+		switch runtime.GOOS {
+		case "android":
+			osTempDir = "/data/local/tmp"
+		case "windows":
+			osTempDir = "C:/Windows/Temp"
+		default:
+			osTempDir = "/tmp"
+		}
+
+		log.Infof("config: empty default temp folder path, using %s", clean.Log(osTempDir))
+	}
+
+	// Check configured temp path first.
+	if c.options.TempPath != "" {
+		if dir := fs.Abs(c.options.TempPath); dir == "" {
+			// Ignore.
+		} else if err := os.MkdirAll(dir, os.ModePerm); err != nil {
+			// Ignore.
+		} else if fs.PathWritable(dir) {
+			return dir
+		}
+	}
+
+	// Find alternative temp path based on storage serial checksum.
+	if dir := filepath.Join(osTempDir, "photoprism_"+c.SerialChecksum()); dir == "" {
+		// Ignore.
+	} else if err := os.MkdirAll(dir, os.ModePerm); err != nil {
+		// Ignore.
+	} else if fs.PathWritable(dir) {
+		return dir
+	}
+
+	// Find alternative temp path based on built-in TempDir() function.
+	if dir, err := ioutil.TempDir(osTempDir, "photoprism_"); err != nil || dir == "" {
+		// Ignore.
+	} else if err = os.MkdirAll(dir, os.ModePerm); err != nil {
+		// Ignore.
+	} else if fs.PathWritable(dir) {
+		return dir
+	}
+
+	return osTempDir
 }
 
 // CachePath returns the path for cache files.
@@ -360,6 +413,15 @@ func (c *Config) AssetsPath() string {
 	}
 
 	return fs.Abs(c.options.AssetsPath)
+}
+
+// CustomAssetsPath returns the path to custom assets such as icons, models and translations.
+func (c *Config) CustomAssetsPath() string {
+	if c.options.CustomAssetsPath != "" {
+		return fs.Abs(c.options.CustomAssetsPath)
+	}
+
+	return ""
 }
 
 // LocalesPath returns the translation locales path.

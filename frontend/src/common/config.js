@@ -25,10 +25,14 @@ Additional information can be found in our Developer Guide:
 
 import Api from "api.js";
 import Event from "pubsub-js";
-import themes from "options/themes.json";
+import * as themes from "options/themes";
 import translations from "locales/translations.json";
 import { Languages } from "options/options";
 import { Photo } from "model/photo";
+import { onSetTheme } from "common/hooks";
+import { onInit } from "common/hooks";
+
+onInit();
 
 export default class Config {
   /**
@@ -340,13 +344,22 @@ export default class Config {
   }
 
   setTheme(name) {
-    this.themeName = name;
+    let theme = onSetTheme(name, this);
+
+    if (!theme) {
+      theme = themes.Get(name);
+      this.themeName = theme.name;
+    }
+
+    if (this.values.settings && this.values.settings.ui) {
+      this.values.settings.ui.theme = this.themeName;
+    }
 
     Event.publish("view.refresh", this);
 
-    this.theme = themes[name] ? themes[name] : themes["default"];
+    this.theme = theme;
 
-    this.setBodyTheme(name);
+    this.setBodyTheme(this.themeName);
 
     if (this.theme.dark) {
       this.setColorMode("dark");

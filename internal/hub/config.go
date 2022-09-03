@@ -23,6 +23,12 @@ import (
 	"github.com/photoprism/photoprism/pkg/fs"
 )
 
+const (
+	StatusUnknown   = ""
+	StatusNew       = "unregistered"
+	StatusCommunity = "ce"
+)
+
 // Config represents backend api credentials for maps & geodata.
 type Config struct {
 	Version   string `json:"version" yaml:"Version"`
@@ -66,6 +72,16 @@ func (c *Config) MapKey() string {
 func (c *Config) Propagate() {
 	places.Key = c.Key
 	places.Secret = c.Secret
+}
+
+// Plus reports if you have a community membership.
+func (c *Config) Plus() bool {
+	switch c.Status {
+	case StatusUnknown, StatusNew, StatusCommunity:
+		return false
+	}
+
+	return len(c.Session) > 0 && len(c.MapKey()) > 0
 }
 
 // Sanitize verifies and sanitizes backend api credentials.
@@ -127,8 +143,13 @@ func (c *Config) DecodeSession() (Session, error) {
 	return result, nil
 }
 
-// Refresh updates backend api credentials.
-func (c *Config) Refresh() (err error) {
+// Update renews backend api credentials without a token.
+func (c *Config) Update() error {
+	return c.Resync("")
+}
+
+// Resync renews backend api credentials with an optional token.
+func (c *Config) Resync(token string) (err error) {
 	mutex.Lock()
 	defer mutex.Unlock()
 
@@ -160,8 +181,10 @@ func (c *Config) Refresh() (err error) {
 		log.Debugf("config: requesting new api key for maps and places")
 	}
 
-	// Create request.
-	if j, err := json.Marshal(NewRequest(c.Version, c.Serial, c.Env, c.PartnerID)); err != nil {
+	// Create JSON request.
+	var j []byte
+
+	if j, err = json.Marshal(NewRequest(c.Version, c.Serial, c.Env, c.PartnerID, token)); err != nil {
 		return err
 	} else if req, err = http.NewRequest(method, url, bytes.NewReader(j)); err != nil {
 		return err

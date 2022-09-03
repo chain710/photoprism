@@ -1,6 +1,4 @@
-#!/bin/bash
-
-PATH="/usr/local/sbin:/usr/sbin:/sbin:/usr/local/bin:/usr/bin:/bin:/scripts"
+#!/usr/bin/env bash
 
 # abort if not executed as root
 if [[ $(id -u) != "0" ]]; then

@@ -7,12 +7,53 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+const (
+	AuthModePublic = "public"
+	AuthModePasswd = "password"
+)
+
 func isBcrypt(s string) bool {
 	b, err := regexp.MatchString(`^\$2[ayb]\$.{56}$`, s)
 	if err != nil {
 		return false
 	}
 	return b
+}
+
+// AdminPassword returns the initial admin password.
+func (c *Config) AdminPassword() string {
+	return c.options.AdminPassword
+}
+
+// Public checks if app runs in public mode and requires no authentication.
+func (c *Config) Public() bool {
+	return c.AuthMode() == AuthModePublic
+}
+
+// SetPublic changes authentication while instance is running, for testing purposes only.
+func (c *Config) SetPublic(enabled bool) {
+	if c.Debug() {
+		c.options.Public = enabled
+	}
+}
+
+// AuthMode returns the authentication mode.
+func (c *Config) AuthMode() string {
+	if c.options.Public || c.options.Demo {
+		return AuthModePublic
+	}
+
+	switch c.options.AuthMode {
+	case AuthModePublic:
+		return AuthModePublic
+	default:
+		return AuthModePasswd
+	}
+}
+
+// Auth checks if authentication is required.
+func (c *Config) Auth() bool {
+	return !c.Public()
 }
 
 // CheckPassword compares given password p with the admin password

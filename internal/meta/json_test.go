@@ -18,7 +18,7 @@ func TestJSON(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// t.Logf("DATA: %+v", data)
+		// t.Logf("DATA: %#v", data)
 
 		assert.Equal(t, "20170323-083538-Berlin-Zoologischer-Garten-2017-2u4.mov", data.FileName)
 		assert.Equal(t, CodecAvc1, data.Codec)
@@ -528,7 +528,7 @@ func TestJSON(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// t.Logf("all: %+v", data.All)
+		// t.Logf("all: %+v", data.json)
 
 		assert.Equal(t, "", data.Artist)
 		assert.Equal(t, "2020-05-24T08:55:21Z", data.TakenAt.Format("2006-01-02T15:04:05Z"))
@@ -547,7 +547,7 @@ func TestJSON(t *testing.T) {
 		assert.Equal(t, "SM-C200", data.CameraModel)
 		assert.Equal(t, "", data.CameraOwner)
 		assert.Equal(t, "", data.CameraSerial)
-		assert.Equal(t, 0, data.FocalLength)
+		assert.Equal(t, 1, data.FocalLength)
 		assert.Equal(t, 1, data.Orientation)
 		assert.Equal(t, projection.Equirectangular.String(), data.Projection)
 	})
@@ -559,7 +559,7 @@ func TestJSON(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// t.Logf("all: %+v", data.All)
+		// t.Logf("all: %+v", data.json)
 
 		assert.Equal(t, "", data.Artist)
 		assert.Equal(t, "2018-07-25T11:18:42Z", data.TakenAt.Format("2006-01-02T15:04:05Z"))
@@ -590,7 +590,7 @@ func TestJSON(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// t.Logf("all: %+v", data.All)
+		// t.Logf("all: %+v", data.json)
 
 		assert.Equal(t, "OLYMPUS DIGITAL CAMERA", data.CameraMake)
 		assert.Equal(t, "E-M10MarkII", data.CameraModel)
@@ -636,7 +636,7 @@ func TestJSON(t *testing.T) {
 		assert.Equal(t, "", data.CameraSerial)
 		assert.Equal(t, "", data.LensMake)
 		assert.Equal(t, "", data.LensModel)
-		assert.Equal(t, 0, data.FocalLength)
+		assert.Equal(t, 5, data.FocalLength)
 		assert.Equal(t, 1, int(data.Orientation))
 	})
 
@@ -732,8 +732,70 @@ func TestJSON(t *testing.T) {
 		assert.Equal(t, "", data.LensModel)
 	})
 
+	t.Run("aurora.jpg.json", func(t *testing.T) {
+		data, err := JSON("testdata/aurora.jpg.json", "")
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		assert.Equal(t, "jpeg", data.Codec)
+		assert.Equal(t, "0s", data.Duration.String())
+		assert.Equal(t, "2021-10-27 10:43:46 +0200 UTC+02:00", data.TakenAtLocal.String())
+		assert.Equal(t, "2021-10-27 10:43:46 +0200 UTC+02:00", data.TakenAt.String())
+		assert.Equal(t, "", data.TimeZone) // Local Time
+		assert.Equal(t, 1, data.Orientation)
+		assert.Equal(t, float32(0), data.Lat)
+		assert.Equal(t, float32(0), data.Lng)
+	})
+
+	t.Run("MVI_1724.MOV.json", func(t *testing.T) {
+		data, err := JSON("testdata/MVI_1724.MOV.json", "")
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		assert.Equal(t, string(video.CodecAVC), data.Codec)
+		assert.Equal(t, "6s", data.Duration.String())
+		assert.Equal(t, "2022-06-25 06:50:58 +0000 UTC", data.TakenAtLocal.String())
+		assert.Equal(t, "2022-06-25 04:50:58 +0000 UTC", data.TakenAt.String())
+		assert.Equal(t, "", data.TimeZone) // Local Time
+		assert.Equal(t, 1, data.Orientation)
+		assert.Equal(t, float32(0), data.Lat)
+		assert.Equal(t, float32(0), data.Lng)
+		assert.Equal(t, "Canon", data.CameraMake)
+		assert.Equal(t, "Canon PowerShot G15", data.CameraModel)
+		assert.Equal(t, "6.1", data.LensModel)
+	})
+
 	t.Run("snow.json", func(t *testing.T) {
 		data, err := JSON("testdata/snow.json", "")
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		assert.Equal(t, CodecJpeg, data.Codec)
+		assert.Equal(t, "0s", data.Duration.String())
+		assert.Equal(t, "2015-03-20 12:07:53 +0000 UTC", data.TakenAtLocal.String())
+		assert.Equal(t, "2015-03-20 12:07:53 +0000 UTC", data.TakenAt.String())
+		assert.Equal(t, 0, data.TakenNs)
+		assert.Equal(t, "", data.TimeZone)
+		assert.Equal(t, 4608, data.Width)
+		assert.Equal(t, 3072, data.Height)
+		assert.Equal(t, 4608, data.ActualWidth())
+		assert.Equal(t, 3072, data.ActualHeight())
+		assert.Equal(t, 1, data.Orientation)
+		assert.Equal(t, float32(0), data.Lat)
+		assert.Equal(t, float32(0), data.Lng)
+		assert.Equal(t, "OLYMPUS IMAGING CORP.", data.CameraMake)
+		assert.Equal(t, "TG-830", data.CameraModel)
+		assert.Equal(t, "", data.LensModel)
+	})
+
+	t.Run("datetime-zero.json", func(t *testing.T) {
+		data, err := JSON("testdata/datetime-zero.json", "")
 
 		if err != nil {
 			t.Fatal(err)
@@ -817,11 +879,12 @@ func TestJSON(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// t.Logf("all: %+v", data.All)
+		// t.Logf("all: %+v", data.json)
 
 		assert.Equal(t, "Jens\r\tMander", data.Artist)
-		assert.Equal(t, "2004-09-23T10:57:57Z", data.TakenAt.Format("2006-01-02T15:04:05Z"))
-		assert.Equal(t, "2004-09-23T10:57:57Z", data.TakenAtLocal.Format("2006-01-02T15:04:05Z"))
+		assert.Equal(t, "", data.TimeZone)
+		assert.Equal(t, "2004-10-07 20:49:16 +0000 UTC", data.TakenAt.String())
+		assert.Equal(t, "2004-10-07 22:49:16 +0000 UTC", data.TakenAtLocal.String())
 		assert.Equal(t, "This is the title", data.Title)
 		assert.Equal(t, "", data.Keywords.String())
 		assert.Equal(t, "This is a\n\ndescription!", data.Description)
@@ -837,7 +900,7 @@ func TestJSON(t *testing.T) {
 		assert.Equal(t, "Canon EOS-1DS", data.CameraModel)
 		assert.Equal(t, "", data.CameraOwner)
 		assert.Equal(t, "123456", data.CameraSerial)
-		assert.Equal(t, 0, data.FocalLength)
+		assert.Equal(t, 17, data.FocalLength)
 		assert.Equal(t, 1, data.Orientation)
 		assert.Equal(t, "", data.Projection)
 	})
@@ -934,7 +997,7 @@ func TestJSON(t *testing.T) {
 		assert.Equal(t, "Canon EOS 6D", data.CameraModel)
 		assert.Equal(t, "", data.CameraOwner)
 		assert.Equal(t, "012324001432", data.CameraSerial)
-		assert.Equal(t, 0, data.FocalLength)
+		assert.Equal(t, 35, data.FocalLength)
 		assert.Equal(t, 1, data.Orientation)
 		assert.Equal(t, "", data.Projection)
 	})
@@ -1006,7 +1069,7 @@ func TestJSON(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// t.Logf("all: %+v", data.All)
+		t.Logf("Iceland-P3.jpg: %#v", data.json["HyperfocalDistance"])
 
 		assert.Equal(t, "Nicolas Cornet", data.Artist)
 		assert.Equal(t, "2012-08-08T22:07:18Z", data.TakenAt.Format("2006-01-02T15:04:05Z"))
@@ -1025,7 +1088,8 @@ func TestJSON(t *testing.T) {
 		assert.Equal(t, "NIKON D800E", data.CameraModel)
 		assert.Equal(t, "", data.CameraOwner)
 		assert.Equal(t, "6001440", data.CameraSerial)
-		assert.Equal(t, 0, data.FocalLength)
+		assert.Equal(t, 16, data.FocalLength)
+		assert.InEpsilon(t, 1.0650, data.FocalDistance, 0.01)
 		assert.Equal(t, 1, data.Orientation)
 		assert.Equal(t, "", data.Projection)
 		assert.Equal(t, "Display P3", data.ColorProfile)
@@ -1038,7 +1102,7 @@ func TestJSON(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// t.Logf("all: %+v", data.All)
+		t.Logf("Iceland-P3-n.jpg: %#v", data.json["HyperfocalDistance"])
 
 		assert.Equal(t, "Nicolas Cornet", data.Artist)
 		assert.Equal(t, "2012-08-08T22:07:18Z", data.TakenAt.Format("2006-01-02T15:04:05Z"))
@@ -1058,6 +1122,7 @@ func TestJSON(t *testing.T) {
 		assert.Equal(t, "", data.CameraOwner)
 		assert.Equal(t, "6001440", data.CameraSerial)
 		assert.Equal(t, 16, data.FocalLength)
+		assert.InEpsilon(t, 1.0650, data.FocalDistance, 0.01)
 		assert.Equal(t, 1, data.Orientation)
 		assert.Equal(t, "", data.Projection)
 		assert.Equal(t, "Display P3", data.ColorProfile)
@@ -1070,7 +1135,7 @@ func TestJSON(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// t.Logf("all: %+v", data.All)
+		// t.Logf("all: %+v", data.json)
 
 		assert.Equal(t, "Nicolas Cornet", data.Artist)
 		assert.Equal(t, "2012-08-08T22:07:18Z", data.TakenAt.Format("2006-01-02T15:04:05Z"))
@@ -1089,7 +1154,7 @@ func TestJSON(t *testing.T) {
 		assert.Equal(t, "NIKON D800E", data.CameraModel)
 		assert.Equal(t, "", data.CameraOwner)
 		assert.Equal(t, "6001440", data.CameraSerial)
-		assert.Equal(t, 0, data.FocalLength)
+		assert.Equal(t, 16, data.FocalLength)
 		assert.Equal(t, 1, data.Orientation)
 		assert.Equal(t, "", data.Projection)
 		assert.Equal(t, "Display P3", data.ColorProfile)
@@ -1102,7 +1167,7 @@ func TestJSON(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// t.Logf("all: %+v", data.All)
+		// t.Logf("all: %+v", data.json)
 
 		assert.Equal(t, "", data.Artist)
 		assert.Equal(t, "0001-01-01T00:00:00Z", data.TakenAt.Format("2006-01-02T15:04:05Z"))
@@ -1135,7 +1200,7 @@ func TestJSON(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		//t.Logf("all: %+v", data.exif)
+		//t.Logf("all: %+v", data.json)
 
 		assert.Equal(t, "creator A, creator B", data.Artist)
 		assert.Equal(t, "my image headline", data.Title)

@@ -26,11 +26,6 @@ var GeoCols = SelectString(GeoResult{}, []string{"*"})
 func PhotosGeo(f form.SearchPhotosGeo) (results GeoResults, err error) {
 	start := time.Now()
 
-	// Parse query string into fields.
-	if err := f.ParseQueryString(); err != nil {
-		return GeoResults{}, err
-	}
-
 	S2Levels := 7
 
 	// Search for nearby photos?
@@ -396,7 +391,7 @@ func PhotosGeo(f form.SearchPhotosGeo) (results GeoResults, err error) {
 		return results, result.Error
 	}
 
-	log.Debugf("geo: found %s for %s [%s]", english.Plural(len(results), "result", "results"), f.SerializeAll(), time.Since(start))
+	log.Debugf("places: found %s for %s [%s]", english.Plural(len(results), "result", "results"), f.SerializeAll(), time.Since(start))
 
 	return results, nil
 }

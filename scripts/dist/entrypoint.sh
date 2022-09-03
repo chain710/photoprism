@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # regular expressions
 re='^[0-9]+$'
@@ -18,7 +18,7 @@ case $DOCKER_ENV in
 
   develop)
     export PATH="/usr/local/sbin:/usr/sbin:/sbin:/bin:/scripts:/usr/local/go/bin:/go/bin:/usr/local/bin:/usr/bin";
-    INIT_SCRIPT="/go/src/github.com/photoprism/photoprism/scripts/dist/entrypoint-init.sh";
+    INIT_SCRIPT="/scripts/entrypoint-init.sh";
     ;;
 
   *)

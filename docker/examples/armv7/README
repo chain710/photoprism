@@ -70,7 +70,7 @@ system resources are running low:
   high concurrency
 
 - As a last measure, you can disable the use of TensorFlow for image
-  classification and facial recognition
+  classification and face recognition
 
 Other issues? Our troubleshooting checklists help you quickly diagnose and
 solve them:
@@ -90,8 +90,11 @@ from Docker Hub and restart your instance in the background:
 Pulling a new version can take several minutes, depending on your internet
 connection speed.
 
-Note that running an image with ":latest" tag does not cause Docker to
-automatically download new images.
+Even when you use an image with the ":latest" tag, Docker does not automatically
+download new images for you. You can either manually upgrade as shown above, or
+set up a service like Watchtower to get automatic updates:
+
+  https://docs.photoprism.app/getting-started/updates/#watchtower
 
 ### Credits ###
 

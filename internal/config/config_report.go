@@ -13,8 +13,8 @@ func (c *Config) Report() (rows [][]string, cols []string) {
 
 	rows = [][]string{
 		// Authentication.
+		{"auth-mode", fmt.Sprintf("%s", c.AuthMode())},
 		{"admin-password", strings.Repeat("*", utf8.RuneCountInString(c.AdminPassword()))},
-		{"auth", fmt.Sprintf("%t", c.Auth())},
 		{"public", fmt.Sprintf("%t", c.Public())},
 
 		// Logging.
@@ -165,6 +165,10 @@ func (c *Config) Report() (rows [][]string, cols []string) {
 		// Daemon Mode.
 		{"pid-filename", c.PIDFilename()},
 		{"log-filename", c.LogFilename()},
+	}
+
+	if p := c.CustomAssetsPath(); p != "" {
+		rows = append(rows, []string{"custom-assets-path", p})
 	}
 
 	return rows, cols

@@ -10,8 +10,6 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/photoprism/photoprism/pkg/media"
-
 	"github.com/karrick/godirwalk"
 
 	"github.com/photoprism/photoprism/internal/config"
@@ -20,6 +18,7 @@ import (
 	"github.com/photoprism/photoprism/internal/mutex"
 	"github.com/photoprism/photoprism/pkg/clean"
 	"github.com/photoprism/photoprism/pkg/fs"
+	"github.com/photoprism/photoprism/pkg/media"
 )
 
 // Import represents an importer that can copy/move MediaFiles to the originals directory.
@@ -69,6 +68,7 @@ func (imp *Import) Start(opt ImportOptions) fs.Done {
 	ind := imp.index
 	importPath := opt.Path
 
+	// Check if the import folder exists.
 	if !fs.PathExists(importPath) {
 		event.Error(fmt.Sprintf("import: %s does not exist", importPath))
 		return done
@@ -130,20 +130,22 @@ func (imp *Import) Start(opt ImportOptions) fs.Done {
 				return errors.New("canceled")
 			}
 
-			isDir := info.IsDir()
+			isDir, _ := info.IsDirOrSymlinkToDir()
 			isSymlink := info.IsSymlink()
 
 			if skip, result := fs.SkipWalk(fileName, isDir, isSymlink, done, ignore); skip {
-				if isDir && result != filepath.SkipDir {
-					if fileName != importPath {
-						directories = append(directories, fileName)
-					}
+				if !isDir || result == filepath.SkipDir {
+					return result
+				}
 
-					folder := entity.NewFolder(entity.RootImport, fs.RelName(fileName, imp.conf.ImportPath()), fs.BirthTime(fileName))
+				if fileName != importPath {
+					directories = append(directories, fileName)
+				}
 
-					if err := folder.Create(); err == nil {
-						log.Infof("import: added folder /%s", folder.Path)
-					}
+				folder := entity.NewFolder(entity.RootImport, fs.RelName(fileName, imp.conf.ImportPath()), fs.BirthTime(fileName))
+
+				if err := folder.Create(); err == nil {
+					log.Infof("import: added folder /%s", folder.Path)
 				}
 
 				return result
@@ -160,6 +162,8 @@ func (imp *Import) Start(opt ImportOptions) fs.Done {
 			// Check if file exists and is not empty.
 			if err != nil {
 				log.Warnf("import: %s", err)
+				return nil
+			} else if mf.Empty() {
 				return nil
 			}
 
@@ -217,7 +221,7 @@ func (imp *Import) Start(opt ImportOptions) fs.Done {
 	if opt.RemoveEmptyDirectories {
 		// Remove empty directories from import path.
 		for _, directory := range directories {
-			if fs.IsEmpty(directory) {
+			if fs.DirIsEmpty(directory) {
 				if err := os.Remove(directory); err != nil {
 					log.Errorf("import: failed deleting empty folder %s (%s)", clean.Log(fs.RelName(directory, importPath)), err)
 				} else {
@@ -245,9 +249,9 @@ func (imp *Import) Start(opt ImportOptions) fs.Done {
 	}
 
 	if filesImported > 0 {
-		// Run facial recognition if enabled.
+		// Run face recognition if enabled.
 		if w := NewFaces(imp.conf); w.Disabled() {
-			log.Debugf("import: skipping facial recognition")
+			log.Debugf("import: skipping face recognition")
 		} else if err := w.Start(FacesOptionsDefault()); err != nil {
 			log.Errorf("import: %s", err)
 		}
