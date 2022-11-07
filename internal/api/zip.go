@@ -15,10 +15,10 @@ import (
 
 	"github.com/photoprism/photoprism/internal/acl"
 	"github.com/photoprism/photoprism/internal/form"
+	"github.com/photoprism/photoprism/internal/get"
 	"github.com/photoprism/photoprism/internal/i18n"
 	"github.com/photoprism/photoprism/internal/photoprism"
 	"github.com/photoprism/photoprism/internal/query"
-	"github.com/photoprism/photoprism/internal/service"
 	"github.com/photoprism/photoprism/pkg/clean"
 	"github.com/photoprism/photoprism/pkg/fs"
 	"github.com/photoprism/photoprism/pkg/rnd"
@@ -29,14 +29,13 @@ import (
 // POST /api/v1/zip
 func ZipCreate(router *gin.RouterGroup) {
 	router.POST("/zip", func(c *gin.Context) {
-		s := Auth(SessionID(c), acl.ResourcePhotos, acl.ActionDownload)
+		s := Auth(c, acl.ResourcePhotos, acl.ActionDownload)
 
-		if s.Invalid() {
-			AbortUnauthorized(c)
+		if s.Abort(c) {
 			return
 		}
 
-		conf := service.Config()
+		conf := get.Config()
 
 		if !conf.Settings().Features.Download {
 			AbortFeatureDisabled(c)
@@ -150,7 +149,7 @@ func ZipDownload(router *gin.RouterGroup) {
 			return
 		}
 
-		conf := service.Config()
+		conf := get.Config()
 		zipBaseName := clean.FileName(filepath.Base(c.Param("filename")))
 		zipPath := path.Join(conf.TempPath(), "zip")
 		zipFileName := path.Join(zipPath, zipBaseName)

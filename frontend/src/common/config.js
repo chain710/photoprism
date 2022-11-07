@@ -29,8 +29,7 @@ import * as themes from "options/themes";
 import translations from "locales/translations.json";
 import { Languages } from "options/options";
 import { Photo } from "model/photo";
-import { onSetTheme } from "common/hooks";
-import { onInit } from "common/hooks";
+import { onInit, onSetTheme } from "common/hooks";
 
 onInit();
 
@@ -43,6 +42,9 @@ export default class Config {
     this.disconnected = false;
     this.storage = storage;
     this.storage_key = "config";
+    this.previewToken = "";
+    this.downloadToken = "";
+    this.updating = false;
 
     this.$vuetify = null;
     this.translations = translations;
@@ -61,7 +63,10 @@ export default class Config {
       this.staticUri = "/static";
       this.apiUri = "/api/v1";
       this.contentUri = this.apiUri;
-      this.values = {};
+      this.values = {
+        mode: "test",
+        name: "Test",
+      };
       this.page = {
         title: "PhotoPrism",
         caption: "AI-Powered Photos App",
@@ -102,7 +107,10 @@ export default class Config {
     this.test = !!values.test;
     this.demo = !!values.demo;
 
+    this.updateTokens();
+
     Event.subscribe("config.updated", (ev, data) => this.setValues(data.config));
+    Event.subscribe("config.tokens", (ev, data) => this.setTokens(data));
     Event.subscribe("count", (ev, data) => this.onCount(ev, data));
     Event.subscribe("people", (ev, data) => this.onPeople(ev, data));
 
@@ -122,23 +130,34 @@ export default class Config {
       return this.update();
     }
 
-    return Promise.resolve();
+    return Promise.resolve(this);
   }
 
   update() {
-    return Api.get("config")
+    if (this.updating !== false) {
+      return this.updating;
+    }
+
+    this.updating = Api.get("config")
       .then(
-        (response) => this.setValues(response.data),
-        () => console.warn("failed pulling updated client config")
+        (resp) => {
+          return this.setValues(resp.data);
+        },
+        () => console.warn("config update failed")
       )
-      .finally(() => Promise.resolve());
+      .finally(() => {
+        this.updating = false;
+        return Promise.resolve(this);
+      });
+
+    return this.updating;
   }
 
   setValues(values) {
     if (!values) return;
 
     if (this.debug) {
-      console.log("config: new values", values);
+      console.log("config: updated", values);
     }
 
     if (values.jsUri && this.values.jsUri !== values.jsUri) {
@@ -146,13 +165,16 @@ export default class Config {
     }
 
     for (let key in values) {
-      if (values.hasOwnProperty(key)) {
+      if (values.hasOwnProperty(key) && values[key] != null) {
         this.set(key, values[key]);
       }
     }
 
+    this.updateTokens();
+
     if (values.settings) {
       this.setBatchSize(values.settings);
+      this.setLanguage(values.settings.ui.language);
       this.setTheme(values.settings.ui.theme);
     }
 
@@ -232,7 +254,7 @@ export default class Config {
       return result[0];
     } else {
       if (this.debug) {
-        console.warn("more than one person matching the same name", result);
+        console.warn("more than one person having the same name", result);
       }
       return result[0];
     }
@@ -343,6 +365,109 @@ export default class Config {
     }
   }
 
+  aclClasses(resource) {
+    let result = [];
+    const perms = ["update", "search", "manage", "share", "delete"];
+
+    perms.forEach((perm) => {
+      if (this.deny(resource, perm)) result.push(`disable-${perm}`);
+    });
+
+    return result;
+  }
+
+  // allow checks whether the current user is granted permission for the specified resource.
+  allow(resource, perm) {
+    if (this.values["acl"] && this.values["acl"][resource]) {
+      if (this.values["acl"][resource]["full_access"]) {
+        return true;
+      } else if (this.values["acl"][resource][perm]) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  // allowAny checks whether the current user is granted any of the permissions for the specified resource.
+  allowAny(resource, perms) {
+    if (this.values["acl"] && this.values["acl"][resource]) {
+      if (this.values["acl"][resource]["full_access"]) {
+        return true;
+      }
+      for (const perm of perms) {
+        if (this.values["acl"][resource][perm]) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  // deny checks whether the current user must be denied access to the specified resource.
+  deny(resource, perm) {
+    return !this.allow(resource, perm);
+  }
+
+  // denyAll checks whether the current user is granted none of the permissions for the specified resource.
+  denyAll(resource, perm) {
+    return !this.allowAny(resource, perm);
+  }
+
+  settings() {
+    return this.values.settings;
+  }
+
+  setSettings(settings) {
+    if (!settings) return;
+
+    if (this.debug) {
+      console.log("config: new settings", settings);
+    }
+
+    this.values.settings = settings;
+
+    this.setBatchSize(settings);
+    this.setLanguage(settings.ui.language);
+    this.setTheme(settings.ui.theme);
+
+    return this;
+  }
+
+  setLanguage(locale) {
+    if (!locale || this.loading()) {
+      return;
+    }
+
+    if (this.values.settings && this.values.settings.ui) {
+      this.values.settings.ui.language = locale;
+      this.storage.setItem(this.storage_key + ".locale", locale);
+      Api.defaults.headers.common["Accept-Language"] = locale;
+    }
+
+    return this;
+  }
+
+  getLanguage() {
+    let locale = "en";
+
+    if (this.loading()) {
+      const stored = this.storage.getItem(this.storage_key + ".locale");
+      if (stored) {
+        locale = stored;
+      }
+    } else if (
+      this.values.settings &&
+      this.values.settings.ui &&
+      this.values.settings.ui.language
+    ) {
+      locale = this.values.settings.ui.language;
+    }
+
+    return locale;
+  }
+
   setTheme(name) {
     let theme = onSetTheme(name, this);
 
@@ -383,6 +508,14 @@ export default class Config {
     return this;
   }
 
+  restoreValues() {
+    const json = this.storage.getItem(this.storage_key);
+    if (json !== "undefined") {
+      this.setValues(JSON.parse(json));
+    }
+    return this;
+  }
+
   set(key, value) {
     this.values[key] = value;
     return this;
@@ -397,11 +530,7 @@ export default class Config {
   }
 
   feature(name) {
-    return this.values.settings.features[name];
-  }
-
-  settings() {
-    return this.values.settings;
+    return this.values.settings.features[name] === true;
   }
 
   rtl() {
@@ -412,12 +541,23 @@ export default class Config {
     return Languages().some((lang) => lang.value === this.values.settings.ui.language && lang.rtl);
   }
 
-  downloadToken() {
-    return this.values["downloadToken"];
+  setTokens(tokens) {
+    if (!tokens || !tokens.previewToken || !tokens.downloadToken) {
+      return;
+    }
+    this.previewToken = tokens.previewToken;
+    this.values.previewToken = tokens.previewToken;
+    this.downloadToken = tokens.downloadToken;
+    this.values.downloadToken = tokens.downloadToken;
   }
 
-  previewToken() {
-    return this.values["previewToken"];
+  updateTokens() {
+    if (this.values["previewToken"]) {
+      this.previewToken = this.values.previewToken;
+    }
+    if (this.values["downloadToken"]) {
+      this.downloadToken = this.values.downloadToken;
+    }
   }
 
   albumCategories() {
@@ -426,6 +566,14 @@ export default class Config {
     }
 
     return [];
+  }
+
+  isPublic() {
+    return this.values && this.values.public;
+  }
+
+  isDemo() {
+    return this.values && this.values.demo;
   }
 
   isSponsor() {
@@ -448,11 +596,21 @@ export default class Config {
     return name;
   }
 
+  getAbout() {
+    const about = this.get("about");
+
+    if (!about) {
+      return "PhotoPrism® Dev";
+    }
+
+    return about;
+  }
+
   getEdition() {
     const edition = this.get("edition");
 
     if (!edition) {
-      return "PhotoPrism® Dev";
+      return "ce";
     }
 
     return edition;
@@ -471,5 +629,16 @@ export default class Config {
 
   getVersion() {
     return this.get("version");
+  }
+
+  getSiteDescription() {
+    return this.values.siteDescription ? this.values.siteDescription : this.values.siteCaption;
+  }
+
+  progress(p) {
+    const el = document.getElementById("progress");
+    if (el) {
+      el.value = p;
+    }
   }
 }

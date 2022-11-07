@@ -153,12 +153,18 @@ export default class Util {
     return s.replace(/\w\S*/g, (w) => w.replace(/^\w/, (c) => c.toUpperCase()));
   }
 
+  static generateToken() {
+    return (Math.random() + 1).toString(36).substring(6);
+  }
+
   static fileType(value) {
     if (!value || typeof value !== "string") {
       return "";
     }
 
     switch (value) {
+      case "jpg":
+        return "JPEG";
       case "raw":
         return "Unprocessed Sensor Data (RAW)";
       case "mov":
@@ -172,9 +178,13 @@ export default class Util {
         return "TIFF";
       case "gif":
         return "GIF";
+      case "dng":
+        return "Adobe Digital Negative";
       case "avc":
       case "avc1":
         return "Advanced Video Coding (AVC) / H.264";
+      case "avif":
+        return "AOMedia Video 1 (AV1)";
       case "hevc":
       case "hvc":
       case "hvc1":
@@ -235,6 +245,8 @@ export default class Util {
         return "Moving Picture Experts Group (MPEG)";
       case "mjpg":
         return "Motion JPEG (M-JPEG)";
+      case "avif":
+        return "AV1 Image File Format (AVIF)";
       case "heif":
         return "High Efficiency Image File Format (HEIF)";
       case "heic":
@@ -249,6 +261,7 @@ export default class Util {
         return "T6/Group 4 Fax";
       case "5":
         return "LZW";
+      case "jpg":
       case "jpeg":
       case "6":
       case "7":

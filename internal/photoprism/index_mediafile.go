@@ -14,7 +14,6 @@ import (
 	"github.com/photoprism/photoprism/internal/event"
 	"github.com/photoprism/photoprism/internal/meta"
 	"github.com/photoprism/photoprism/internal/query"
-
 	"github.com/photoprism/photoprism/pkg/clean"
 	"github.com/photoprism/photoprism/pkg/fs"
 	"github.com/photoprism/photoprism/pkg/txt"
@@ -22,6 +21,11 @@ import (
 
 // MediaFile indexes a single media file.
 func (ind *Index) MediaFile(m *MediaFile, o IndexOptions, originalName, photoUID string) (result IndexResult) {
+	return ind.UserMediaFile(m, o, originalName, photoUID, entity.OwnerUnknown)
+}
+
+// UserMediaFile indexes a single media file owned by a user.
+func (ind *Index) UserMediaFile(m *MediaFile, o IndexOptions, originalName, photoUID, userUID string) (result IndexResult) {
 	if m == nil {
 		result.Status = IndexFailed
 		result.Err = errors.New("index: media file is nil - possible bug")
@@ -46,7 +50,7 @@ func (ind *Index) MediaFile(m *MediaFile, o IndexOptions, originalName, photoUID
 
 	file, primaryFile := entity.File{}, entity.File{}
 
-	photo := entity.NewPhoto(o.Stack)
+	photo := entity.NewUserPhoto(o.Stack, userUID)
 	metaData := meta.New()
 	labels := classify.Labels{}
 	stripSequence := Config().Settings().StackSequences() && o.Stack
@@ -241,11 +245,9 @@ func (ind *Index) MediaFile(m *MediaFile, o IndexOptions, originalName, photoUID
 			photo.PhotoStack = entity.IsStackable
 		}
 
-		if yamlName := fs.YamlFile.FindFirst(m.FileName(), []string{Config().SidecarPath(), fs.HiddenPath}, Config().OriginalsPath(), stripSequence); yamlName != "" {
+		if yamlName := fs.SidecarYAML.FindFirst(m.FileName(), []string{Config().SidecarPath(), fs.HiddenPath}, Config().OriginalsPath(), stripSequence); yamlName != "" {
 			if err := photo.LoadFromYaml(yamlName); err != nil {
 				log.Errorf("index: %s in %s (restore from yaml)", err.Error(), logName)
-			} else if err := photo.Find(); err != nil {
-				log.Infof("index: %s restored from %s", clean.Log(m.BaseName()), clean.Log(filepath.Base(yamlName)))
 			} else {
 				photoExists = true
 				log.Infof("index: uid %s restored from %s", photo.PhotoUID, clean.Log(filepath.Base(yamlName)))
@@ -429,7 +431,7 @@ func (ind *Index) MediaFile(m *MediaFile, o IndexOptions, originalName, photoUID
 			log.Warn(err.Error())
 			file.FileError = err.Error()
 		}
-	case m.IsRaw(), m.IsHEIF(), m.IsImageOther():
+	case m.IsRaw(), m.IsDNG(), m.IsHEIC(), m.IsAVIF(), m.IsImageOther():
 		if metaData := m.MetaData(); metaData.Error == nil {
 			// Update basic metadata.
 			photo.SetTitle(metaData.Title, entity.SrcMeta)
@@ -551,6 +553,10 @@ func (ind *Index) MediaFile(m *MediaFile, o IndexOptions, originalName, photoUID
 
 			if res := m.Megapixels(); res > photo.PhotoResolution {
 				photo.PhotoResolution = res
+			}
+
+			if file.FileDuration > photo.PhotoDuration {
+				photo.PhotoDuration = file.FileDuration
 			}
 
 			photo.SetCamera(entity.FirstOrCreateCamera(entity.NewCamera(m.CameraModel(), m.CameraMake())), entity.SrcMeta)
@@ -691,10 +697,12 @@ func (ind *Index) MediaFile(m *MediaFile, o IndexOptions, originalName, photoUID
 			return result
 		}
 	} else {
-		if err := photo.FirstOrCreate(); err != nil {
+		if p := photo.FirstOrCreate(); p == nil {
 			result.Status = IndexFailed
 			result.Err = fmt.Errorf("index: %s in %s (find or create photo)", err, logName)
 			return result
+		} else {
+			photo = *p
 		}
 
 		if photo.PhotoPrivate {

@@ -59,9 +59,9 @@ func Start(conf *config.Config) {
 				mutex.SyncWorker.Cancel()
 				return
 			case <-ticker.C:
-				StartMeta(conf)
-				StartShare(conf)
-				StartSync(conf)
+				RunMeta(conf)
+				RunShare(conf)
+				RunSync(conf)
 			}
 		}
 	}()
@@ -72,9 +72,9 @@ func Stop() {
 	stop <- true
 }
 
-// StartMeta runs the metadata worker once.
-func StartMeta(conf *config.Config) {
-	if !mutex.WorkersBusy() {
+// RunMeta runs the metadata worker once.
+func RunMeta(conf *config.Config) {
+	if !mutex.IndexWorkersRunning() {
 		go func() {
 			worker := NewMeta(conf)
 
@@ -88,9 +88,9 @@ func StartMeta(conf *config.Config) {
 	}
 }
 
-// StartShare runs the share worker once.
-func StartShare(conf *config.Config) {
-	if !mutex.ShareWorker.Busy() {
+// RunShare runs the share worker once.
+func RunShare(conf *config.Config) {
+	if !mutex.ShareWorker.Running() {
 		go func() {
 			worker := NewShare(conf)
 			if err := worker.Start(); err != nil {
@@ -100,9 +100,9 @@ func StartShare(conf *config.Config) {
 	}
 }
 
-// StartSync runs the sync worker once.
-func StartSync(conf *config.Config) {
-	if !mutex.SyncWorker.Busy() {
+// RunSync runs the sync worker once.
+func RunSync(conf *config.Config) {
+	if !mutex.SyncWorker.Running() {
 		go func() {
 			worker := NewSync(conf)
 			if err := worker.Start(); err != nil {

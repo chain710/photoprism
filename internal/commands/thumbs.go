@@ -1,12 +1,12 @@
 package commands
 
 import (
+	"context"
 	"time"
 
 	"github.com/urfave/cli"
 
-	"github.com/photoprism/photoprism/internal/config"
-	"github.com/photoprism/photoprism/internal/service"
+	"github.com/photoprism/photoprism/internal/get"
 	"github.com/photoprism/photoprism/pkg/clean"
 )
 
@@ -31,16 +31,21 @@ var ThumbsCommand = cli.Command{
 func thumbsAction(ctx *cli.Context) error {
 	start := time.Now()
 
-	conf := config.NewConfig(ctx)
-	service.SetConfig(conf)
+	conf, err := InitConfig(ctx)
 
-	if err := conf.Init(); err != nil {
+	_, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	if err != nil {
 		return err
 	}
 
+	conf.RegisterDb()
+	defer conf.Shutdown()
+
 	log.Infof("creating thumbs in %s", clean.Log(conf.ThumbCachePath()))
 
-	rs := service.Thumbs()
+	rs := get.Thumbs()
 
 	if err := rs.Start(ctx.Bool("force"), ctx.Bool("originals")); err != nil {
 		log.Error(err)

@@ -33,7 +33,10 @@
           :data-index="index"
           class="flex xs12 sm6 md4 lg3 xlg2 xxxl1 d-flex"
       >
-        <div v-if="index < firstVisibleElementIndex || index > lastVisibileElementIndex" class="accent lighten-3 result placeholder">
+        <div v-if="index < firstVisibleElementIndex || index > lastVisibileElementIndex"
+             :data-uid="photo.UID"
+             class="accent lighten-3 result placeholder"
+        >
           <div class="accent lighten-2 image"/>
           <div v-if="photo.Quality < 3 && context === 'review'" style="width: 100%; height: 34px"/>
           <div class="pa-3 card-details">
@@ -185,36 +188,36 @@
                 </button>
               </h3>
               <div v-if="photo.Description" class="caption mb-2" :title="$gettext('Description')">
-                <button @[!isSharedView&&`click`].exact="editPhoto(index)">
+                <button @click.exact="editPhoto(index)">
                   {{ photo.Description }}
                 </button>
               </div>
               <div class="caption">
                 <button class="action-date-edit" :data-uid="photo.UID"
-                        @[!isSharedView&&`click`].exact="editPhoto(index)">
+                        @click.exact="editPhoto(index)">
                   <i :title="$gettext('Taken')">date_range</i>
                   {{ photo.getDateString(true) }}
                 </button>
                 <br>
                 <button v-if="photo.Type === 'video'" :title="$gettext('Video')"
-                        @[!isSharedView&&`click`].exact="openPhoto(index)">
+                        @click.exact="openPhoto(index)">
                   <i>movie</i>
                   {{ photo.getVideoInfo() }}
                 </button>
                 <button v-else-if="photo.Type === 'animated'" :title="$gettext('Animated')+' GIF'"
-                        @[!isSharedView&&`click`].exact="openPhoto(index)">
+                        @click.exact="openPhoto(index)">
                   <i>gif_box</i>
                   {{ photo.getVideoInfo() }}
                 </button>
                 <button v-else :title="$gettext('Camera')" class="action-camera-edit"
-                        :data-uid="photo.UID" @[!isSharedView&&`click`].exact="editPhoto(index)">
+                        :data-uid="photo.UID" @click.exact="editPhoto(index)">
                   <i>photo_camera</i>
                   {{ photo.getPhotoInfo() }}
                 </button>
                 <template v-if="filter.order === 'name' && $config.feature('download')">
                   <br>
                   <button :title="$gettext('Name')"
-                          @[!isSharedView&&`click`].exact="downloadFile(index)">
+                          @click.exact="downloadFile(index)">
                     <i>insert_drive_file</i>
                     {{ photo.baseName() }}
                   </button>
@@ -222,7 +225,7 @@
                 <template v-if="featPlaces && photo.Country !== 'zz'">
                   <br>
                   <button :title="$gettext('Location')" class="action-location"
-                          :data-uid="photo.UID" @[!isSharedView&&`click`].exact="openLocation(index)">
+                          :data-uid="photo.UID" @click.exact="openLocation(index)">
                     <i>location_on</i>
                     {{ photo.locationInfo() }}
                   </button>
@@ -266,13 +269,11 @@ export default {
     },
     album: {
       type: Object,
-      default: () => {
-      },
+      default: () => {},
     },
     filter: {
       type: Object,
-      default: () => {
-      },
+      default: () => {},
     },
     context: {
       type: String,
@@ -346,7 +347,7 @@ export default {
       );
 
       // we observe only every 5th item, so we increase the rendered
-      // range here by 4 items in every directio just to be safe
+      // range here by 4 items in every direction just to be safe
       this.firstVisibleElementIndex = smallestIndex - 4;
       this.lastVisibileElementIndex = largestIndex + 4;
     },
@@ -373,7 +374,7 @@ export default {
       Notify.success(this.$gettext("Downloading…"));
 
       const photo = this.photos[index];
-      download(`${this.$config.apiUri}/dl/${photo.Hash}?t=${this.$config.downloadToken()}`, photo.FileName);
+      download(`${this.$config.apiUri}/dl/${photo.Hash}?t=${this.$config.downloadToken}`, photo.FileName);
     },
     toggleLike(ev, index) {
       const inputType = this.input.eval(ev, index);

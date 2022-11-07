@@ -1,5 +1,5 @@
 /*
-Package commands provides photoprism CLI (sub-)commands.
+Package commands provides the CLI commands of PhotoPrism.
 
 Copyright (c) 2018 - 2022 PhotoPrism UG. All rights reserved.
 
@@ -25,12 +25,14 @@ Additional information can be found in our Developer Guide:
 package commands
 
 import (
+	"context"
 	"os"
 	"syscall"
 
 	"github.com/sevlyar/go-daemon"
 	"github.com/urfave/cli"
 
+	"github.com/photoprism/photoprism/internal/config"
 	"github.com/photoprism/photoprism/internal/event"
 	"github.com/photoprism/photoprism/pkg/fs"
 )
@@ -53,6 +55,7 @@ var PhotoPrism = []cli.Command{
 	MomentsCommand,
 	ConvertCommand,
 	ThumbsCommand,
+	MigrateCommand,
 	MigrationsCommand,
 	BackupCommand,
 	RestoreCommand,
@@ -72,14 +75,38 @@ func childAlreadyRunning(filePath string) (pid int, running bool) {
 	}
 
 	pid, err := daemon.ReadPidFile(filePath)
+
+	// Failed?
 	if err != nil {
 		return pid, false
 	}
 
-	process, err := os.FindProcess(int(pid))
+	process, err := os.FindProcess(pid)
+
+	// Failed?
 	if err != nil {
 		return pid, false
 	}
 
 	return pid, process.Signal(syscall.Signal(0)) == nil
+}
+
+// CallWithDependencies calls a command action with initialized dependencies.
+func CallWithDependencies(ctx *cli.Context, action func(conf *config.Config) error) (err error) {
+	conf, err := InitConfig(ctx)
+
+	_, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	if err != nil {
+		return err
+	}
+
+	conf.RegisterDb()
+	defer conf.Shutdown()
+
+	// Run command.
+	err = action(conf)
+
+	return err
 }

@@ -9,8 +9,9 @@ import (
 // SearchPhotos represents search form fields for "/api/v1/photos".
 type SearchPhotos struct {
 	Query     string    `form:"q"`
-	Filter    string    `form:"filter" notes:"-" serialize:"-"`
-	UID       string    `form:"uid" example:"uid:pqbcf5j446s0futy" notes:"Internal Unique ID, only exact matches"`
+	Scope     string    `form:"s" serialize:"-" example:"s:ariqwb43p5dh9h13" notes:"Limits the results to one album or another scope, if specified"`
+	Filter    string    `form:"filter" serialize:"-" notes:"-"`
+	UID       string    `form:"uid" example:"uid:pqbcf5j446s0futy" notes:"Search for specific files or photos, only exact matches"`
 	Type      string    `form:"type" example:"type:raw" notes:"Media Type (image, video, raw, live, animated); OR search with |"`
 	Path      string    `form:"path" example:"path:2020/Holiday" notes:"Path Name, OR search with |, supports * wildcards"`
 	Folder    string    `form:"folder" example:"folder:\"*/2020\"" notes:"Path Name, OR search with |, supports * wildcards"` // Alias for Path
@@ -55,6 +56,7 @@ type SearchPhotos struct {
 	Category  string    `form:"category"  notes:"Location Category Name"`                                                                                                                                             // Moments
 	Country   string    `form:"country" example:"country:\"de|us\"" notes:"Country Code, OR search with |"`                                                                                                           // Moments
 	State     string    `form:"state" example:"state:\"Baden-Württemberg\"" notes:"Name of State (Location), OR search with |"`                                                                                       // Moments
+	City      string    `form:"city" example:"city:\"Berlin\"" notes:"Name of City (Location), OR search with |"`                                                                                                     // Moments
 	Year      string    `form:"year" example:"year:1990|2003" notes:"Year Number, OR search with |"`                                                                                                                  // Moments
 	Month     string    `form:"month" example:"month:7|10" notes:"Month (1-12), OR search with |"`                                                                                                                    // Moments
 	Day       string    `form:"day" example:"day:3|13" notes:"Day of Month (1-31), OR search with |"`                                                                                                                 // Moments
@@ -137,6 +139,11 @@ func (f *SearchPhotos) SerializeAll() string {
 	return Serialize(f, true)
 }
 
-func NewPhotoSearch(query string) SearchPhotos {
+// FindUidOnly checks if search filters other than UID may be skipped to improve performance.
+func (f *SearchPhotos) FindUidOnly() bool {
+	return f.UID != "" && f.Query == "" && f.Scope == "" && f.Filter == "" && f.Album == "" && f.Albums == ""
+}
+
+func NewSearchPhotos(query string) SearchPhotos {
 	return SearchPhotos{Query: query}
 }

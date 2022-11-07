@@ -3,8 +3,12 @@ package config
 import (
 	"regexp"
 
-	"github.com/photoprism/photoprism/pkg/rnd"
+	"github.com/photoprism/photoprism/internal/entity"
+
 	"golang.org/x/crypto/bcrypt"
+
+	"github.com/photoprism/photoprism/pkg/clean"
+	"github.com/photoprism/photoprism/pkg/rnd"
 )
 
 const (
@@ -20,9 +24,42 @@ func isBcrypt(s string) bool {
 	return b
 }
 
+// AdminUser returns the admin auth name.
+func (c *Config) AdminUser() string {
+	c.options.AdminUser = clean.Username(c.options.AdminUser)
+
+	if c.options.AdminUser == "" {
+		c.options.AdminUser = "admin"
+	}
+
+	return c.options.AdminUser
+}
+
 // AdminPassword returns the initial admin password.
 func (c *Config) AdminPassword() string {
-	return c.options.AdminPassword
+	return clean.Password(c.options.AdminPassword)
+}
+
+// SessionMaxAge returns the time in seconds until API sessions expire automatically.
+func (c *Config) SessionMaxAge() int64 {
+	if c.options.SessionMaxAge < 0 {
+		return 0
+	} else if c.options.SessionMaxAge == 0 {
+		return DefaultSessionMaxAge
+	}
+
+	return c.options.SessionMaxAge
+}
+
+// SessionTimeout returns the time in seconds until API sessions expire due to inactivity
+func (c *Config) SessionTimeout() int64 {
+	if c.options.SessionTimeout < 0 {
+		return 0
+	} else if c.options.SessionTimeout == 0 {
+		return DefaultSessionTimeout
+	}
+
+	return c.options.SessionTimeout
 }
 
 // Public checks if app runs in public mode and requires no authentication.
@@ -30,10 +67,21 @@ func (c *Config) Public() bool {
 	return c.AuthMode() == AuthModePublic
 }
 
-// SetPublic changes authentication while instance is running, for testing purposes only.
-func (c *Config) SetPublic(enabled bool) {
-	if c.Debug() {
-		c.options.Public = enabled
+// SetAuthMode changes the authentication mode (for use in tests only).
+func (c *Config) SetAuthMode(mode string) {
+	if !c.Debug() {
+		return
+	}
+
+	switch mode {
+	case AuthModePublic:
+		c.options.AuthMode = AuthModePublic
+		c.options.Public = true
+		entity.CheckTokens = false
+	default:
+		c.options.AuthMode = AuthModePasswd
+		c.options.Public = false
+		entity.CheckTokens = true
 	}
 }
 
@@ -68,31 +116,28 @@ func (c *Config) CheckPassword(p string) bool {
 	return ap == p
 }
 
-// InvalidDownloadToken checks if the token is invalid.
-func (c *Config) InvalidDownloadToken(t string) bool {
-	return c.DownloadToken() != t
-}
-
 // DownloadToken returns the DOWNLOAD api token (you can optionally use a static value for permanent caching).
 func (c *Config) DownloadToken() string {
-	if c.options.DownloadToken == "" {
+	if c.Public() {
+		return entity.TokenPublic
+	} else if c.options.DownloadToken == "" {
 		c.options.DownloadToken = rnd.GenerateToken(8)
 	}
 
 	return c.options.DownloadToken
 }
 
-// InvalidPreviewToken checks if the preview token is invalid.
-func (c *Config) InvalidPreviewToken(t string) bool {
-	return c.PreviewToken() != t && c.DownloadToken() != t
+// InvalidDownloadToken checks if the token is invalid.
+func (c *Config) InvalidDownloadToken(t string) bool {
+	return entity.InvalidDownloadToken(t)
 }
 
 // PreviewToken returns the preview image api token (based on the unique storage serial by default).
 func (c *Config) PreviewToken() string {
-	if c.options.PreviewToken == "" {
-		if c.Public() {
-			c.options.PreviewToken = "public"
-		} else if c.Serial() == "" {
+	if c.Public() {
+		return entity.TokenPublic
+	} else if c.options.PreviewToken == "" {
+		if c.Serial() == "" {
 			return "********"
 		} else {
 			c.options.PreviewToken = c.SerialChecksum()
@@ -100,4 +145,9 @@ func (c *Config) PreviewToken() string {
 	}
 
 	return c.options.PreviewToken
+}
+
+// InvalidPreviewToken checks if the preview token is invalid.
+func (c *Config) InvalidPreviewToken(t string) bool {
+	return entity.InvalidPreviewToken(t)
 }

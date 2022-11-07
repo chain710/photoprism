@@ -9,10 +9,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/photoprism/photoprism/internal/acl"
 	"github.com/photoprism/photoprism/internal/event"
+	"github.com/photoprism/photoprism/internal/get"
 	"github.com/photoprism/photoprism/internal/i18n"
 	"github.com/photoprism/photoprism/internal/photoprism"
 	"github.com/photoprism/photoprism/internal/query"
-	"github.com/photoprism/photoprism/internal/service"
 )
 
 // DeleteFile removes a file from storage.
@@ -24,24 +24,23 @@ import (
 //	file_uid: string File UID as returned by the API
 func DeleteFile(router *gin.RouterGroup) {
 	router.DELETE("/photos/:uid/files/:file_uid", func(c *gin.Context) {
-		s := Auth(SessionID(c), acl.ResourceFiles, acl.ActionDelete)
+		s := Auth(c, acl.ResourceFiles, acl.ActionDelete)
 
-		if s.Invalid() {
-			AbortUnauthorized(c)
+		if s.Abort(c) {
 			return
 		}
 
-		conf := service.Config()
+		conf := get.Config()
 
 		if conf.ReadOnly() || !conf.Settings().Features.Edit {
 			Abort(c, http.StatusForbidden, i18n.ErrReadOnly)
 			return
 		}
 
-		photoUID := clean.IdString(c.Param("uid"))
-		fileUID := clean.IdString(c.Param("file_uid"))
+		photoUid := clean.UID(c.Param("uid"))
+		fileUid := clean.UID(c.Param("file_uid"))
 
-		file, err := query.FileByUID(fileUID)
+		file, err := query.FileByUID(fileUid)
 
 		// Found?
 		if err != nil {
@@ -86,12 +85,12 @@ func DeleteFile(router *gin.RouterGroup) {
 		}
 
 		// Notify clients by publishing events.
-		PublishPhotoEvent(EntityUpdated, photoUID, c)
+		PublishPhotoEvent(EntityUpdated, photoUid, c)
 
 		// Show translated success message.
 		event.SuccessMsg(i18n.MsgFileDeleted)
 
-		if p, err := query.PhotoPreloadByUID(photoUID); err != nil {
+		if p, err := query.PhotoPreloadByUID(photoUid); err != nil {
 			AbortEntityNotFound(c)
 			return
 		} else {

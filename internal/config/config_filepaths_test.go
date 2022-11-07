@@ -4,12 +4,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/photoprism/photoprism/pkg/rnd"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/photoprism/photoprism/pkg/rnd"
 )
 
 func TestConfig_FindExecutable(t *testing.T) {
-	assert.Equal(t, "", findExecutable("yyy", "xxx"))
+	assert.Equal(t, "", findBin("yyy", "xxx"))
 }
 
 func TestConfig_SidecarPath(t *testing.T) {
@@ -20,6 +21,42 @@ func TestConfig_SidecarPath(t *testing.T) {
 	assert.Equal(t, ".photoprism", c.SidecarPath())
 	c.options.SidecarPath = ""
 	assert.Equal(t, "/go/src/github.com/photoprism/photoprism/storage/testdata/sidecar", c.SidecarPath())
+}
+
+func TestConfig_UsersPath(t *testing.T) {
+	c := NewConfig(CliTestContext())
+	assert.Contains(t, c.UsersPath(), "testdata/users")
+}
+
+func TestConfig_UserPath(t *testing.T) {
+	c := NewConfig(CliTestContext())
+	assert.Equal(t, "", c.UserPath(""))
+	assert.Equal(t, "", c.UserPath("etaetyget"))
+	assert.Contains(t, c.UserPath("urjult03ceelhw6k"), "testdata/users/urjult03ceelhw6k")
+}
+
+func TestConfig_UserUploadPath(t *testing.T) {
+	c := NewConfig(CliTestContext())
+	if dir, err := c.UserUploadPath("", ""); err == nil {
+		t.Error("error expected")
+	} else {
+		assert.Equal(t, "", dir)
+	}
+	if dir, err := c.UserUploadPath("etaetyget", ""); err == nil {
+		t.Error("error expected")
+	} else {
+		assert.Equal(t, "", dir)
+	}
+	if dir, err := c.UserUploadPath("urjult03ceelhw6k", ""); err != nil {
+		t.Fatal(err)
+	} else {
+		assert.Contains(t, dir, "testdata/users/urjult03ceelhw6k/upload")
+	}
+	if dir, err := c.UserUploadPath("urjult03ceelhw6k", "foo"); err != nil {
+		t.Fatal(err)
+	} else {
+		assert.Contains(t, dir, "testdata/users/urjult03ceelhw6k/upload/foo")
+	}
 }
 
 func TestConfig_SidecarPathIsAbs(t *testing.T) {
@@ -38,7 +75,8 @@ func TestConfig_SidecarWritable(t *testing.T) {
 
 func TestConfig_FFmpegBin(t *testing.T) {
 	c := NewConfig(CliTestContext())
-	assert.Equal(t, "/usr/bin/ffmpeg", c.FFmpegBin())
+
+	assert.True(t, strings.Contains(c.FFmpegBin(), "/bin/ffmpeg"))
 }
 
 func TestConfig_TempPath(t *testing.T) {
@@ -92,6 +130,15 @@ func TestConfig_CmdCachePath(t *testing.T) {
 		t.Fatal("cmd cache path is empty")
 	} else if !strings.HasPrefix(dir, c.CachePath()) {
 		t.Fatalf("unexpected cmd cache path: %s", dir)
+	}
+}
+
+func TestConfig_CmdLibPath(t *testing.T) {
+	c := NewConfig(CliTestContext())
+	if dir := c.CmdLibPath(); dir == "" {
+		t.Fatal("cmd lib path is empty")
+	} else if !strings.HasPrefix(dir, "/usr") {
+		t.Fatalf("unexpected cmd lib path: %s", dir)
 	}
 }
 

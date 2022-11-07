@@ -1,5 +1,6 @@
 # Application files and directories
 /photoprism
+/photoprism-*
 /photos/originals/*
 /photos/import/*
 /storage/*
@@ -18,6 +19,7 @@
 /assets/static/build/
 /package-lock.json
 /frontend/tests_output
+/tmp/
 *.log
 *.pid
 *.db

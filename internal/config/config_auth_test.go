@@ -23,6 +23,15 @@ func TestAuthMode(t *testing.T) {
 	assert.Equal(t, AuthModePasswd, c.AuthMode())
 	c.options.AuthMode = "password"
 	assert.Equal(t, AuthModePasswd, c.AuthMode())
+	c.options.Debug = false
+	c.SetAuthMode(AuthModePublic)
+	assert.Equal(t, AuthModePasswd, c.AuthMode())
+	c.options.Debug = true
+	c.SetAuthMode(AuthModePublic)
+	assert.Equal(t, AuthModePublic, c.AuthMode())
+	c.SetAuthMode(AuthModePasswd)
+	assert.Equal(t, AuthModePasswd, c.AuthMode())
+	c.options.Debug = false
 }
 
 func TestAuth(t *testing.T) {
@@ -35,6 +44,24 @@ func TestAuth(t *testing.T) {
 	assert.True(t, c.Auth())
 	c.options.Demo = true
 	assert.False(t, c.Auth())
+}
+
+func TestSessMaxAge(t *testing.T) {
+	c := NewConfig(CliTestContext())
+	assert.Equal(t, DefaultSessionMaxAge, c.SessionMaxAge())
+	c.options.SessionMaxAge = -1
+	assert.Equal(t, int64(0), c.SessionMaxAge())
+	c.options.SessionMaxAge = 0
+	assert.Equal(t, DefaultSessionMaxAge, c.SessionMaxAge())
+}
+
+func TestSessTimeout(t *testing.T) {
+	c := NewConfig(CliTestContext())
+	assert.Equal(t, DefaultSessionTimeout, c.SessionTimeout())
+	c.options.SessionTimeout = -1
+	assert.Equal(t, int64(0), c.SessionTimeout())
+	c.options.SessionTimeout = 0
+	assert.Equal(t, DefaultSessionTimeout, c.SessionTimeout())
 }
 
 func TestUtils_CheckPassword(t *testing.T) {

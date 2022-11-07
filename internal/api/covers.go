@@ -7,9 +7,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/photoprism/photoprism/internal/get"
 	"github.com/photoprism/photoprism/internal/photoprism"
 	"github.com/photoprism/photoprism/internal/query"
-	"github.com/photoprism/photoprism/internal/service"
 	"github.com/photoprism/photoprism/internal/thumb"
 	"github.com/photoprism/photoprism/pkg/clean"
 	"github.com/photoprism/photoprism/pkg/fs"
@@ -38,9 +38,9 @@ func AlbumCover(router *gin.RouterGroup) {
 		}
 
 		start := time.Now()
-		conf := service.Config()
+		conf := get.Config()
 		thumbName := thumb.Name(clean.Token(c.Param("size")))
-		uid := clean.IdString(c.Param("uid"))
+		uid := clean.UID(c.Param("uid"))
 
 		size, ok := thumb.Sizes[thumbName]
 
@@ -50,7 +50,7 @@ func AlbumCover(router *gin.RouterGroup) {
 			return
 		}
 
-		cache := service.CoverCache()
+		cache := get.CoverCache()
 		cacheKey := CacheKey(albumCover, uid, string(thumbName))
 
 		if cacheData, ok := cache.Get(cacheKey); ok {
@@ -151,9 +151,9 @@ func LabelCover(router *gin.RouterGroup) {
 		}
 
 		start := time.Now()
-		conf := service.Config()
+		conf := get.Config()
 		thumbName := thumb.Name(clean.Token(c.Param("size")))
-		uid := clean.IdString(c.Param("uid"))
+		uid := clean.UID(c.Param("uid"))
 
 		size, ok := thumb.Sizes[thumbName]
 
@@ -163,7 +163,7 @@ func LabelCover(router *gin.RouterGroup) {
 			return
 		}
 
-		cache := service.CoverCache()
+		cache := get.CoverCache()
 		cacheKey := CacheKey(labelCover, uid, string(thumbName))
 
 		if cacheData, ok := cache.Get(cacheKey); ok {

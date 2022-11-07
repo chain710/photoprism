@@ -7,12 +7,10 @@ import (
 	"time"
 
 	"github.com/dustin/go-humanize/english"
-
 	"github.com/urfave/cli"
 
-	"github.com/photoprism/photoprism/internal/config"
+	"github.com/photoprism/photoprism/internal/get"
 	"github.com/photoprism/photoprism/internal/photoprism"
-	"github.com/photoprism/photoprism/internal/service"
 	"github.com/photoprism/photoprism/pkg/clean"
 	"github.com/photoprism/photoprism/pkg/fs"
 )
@@ -21,7 +19,7 @@ import (
 var IndexCommand = cli.Command{
 	Name:      "index",
 	Usage:     "Indexes original media files",
-	ArgsUsage: "[originals folder]",
+	ArgsUsage: "[sub-folder]",
 	Flags:     indexFlags,
 	Action:    indexAction,
 }
@@ -45,17 +43,17 @@ var indexFlags = []cli.Flag{
 func indexAction(ctx *cli.Context) error {
 	start := time.Now()
 
-	conf := config.NewConfig(ctx)
-	service.SetConfig(conf)
+	conf, err := InitConfig(ctx)
 
 	_, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	if err := conf.Init(); err != nil {
+	if err != nil {
 		return err
 	}
 
 	conf.InitDb()
+	defer conf.Shutdown()
 
 	// Use first argument to limit scope if set.
 	subPath := strings.TrimSpace(ctx.Args().First())
@@ -72,14 +70,14 @@ func indexAction(ctx *cli.Context) error {
 
 	var indexed fs.Done
 
-	if w := service.Index(); w != nil {
+	if w := get.Index(); w != nil {
 		convert := conf.Settings().Index.Convert && conf.SidecarWritable()
 		opt := photoprism.NewIndexOptions(subPath, ctx.Bool("force"), convert, true, false, !ctx.Bool("archived"))
 
 		indexed = w.Start(opt)
 	}
 
-	if w := service.Purge(); w != nil {
+	if w := get.Purge(); w != nil {
 		purgeStart := time.Now()
 		opt := photoprism.PurgeOptions{
 			Path:   subPath,
@@ -95,7 +93,7 @@ func indexAction(ctx *cli.Context) error {
 
 	if ctx.Bool("cleanup") {
 		cleanupStart := time.Now()
-		w := service.CleanUp()
+		w := get.CleanUp()
 
 		opt := photoprism.CleanUpOptions{
 			Dry: false,
@@ -112,8 +110,6 @@ func indexAction(ctx *cli.Context) error {
 	elapsed := time.Since(start)
 
 	log.Infof("indexed %s in %s", english.Plural(len(indexed), "file", "files"), elapsed)
-
-	conf.Shutdown()
 
 	return nil
 }

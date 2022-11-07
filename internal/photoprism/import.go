@@ -61,7 +61,7 @@ func (imp *Import) Start(opt ImportOptions) fs.Done {
 	done := make(fs.Done)
 
 	if imp.conf == nil {
-		log.Errorf("import: config is nil")
+		log.Errorf("import: config is not set")
 		return done
 	}
 
@@ -74,12 +74,15 @@ func (imp *Import) Start(opt ImportOptions) fs.Done {
 		return done
 	}
 
-	if err := mutex.MainWorker.Start(); err != nil {
-		event.Error(fmt.Sprintf("import: %s", err.Error()))
-		return done
-	}
+	// Make sure to run import only once, unless otherwise requested.
+	if !opt.NonBlocking {
+		if err := mutex.MainWorker.Start(); err != nil {
+			event.Error(fmt.Sprintf("import: %s", err.Error()))
+			return done
+		}
 
-	defer mutex.MainWorker.Stop()
+		defer mutex.MainWorker.Stop()
+	}
 
 	if err := ind.tensorFlow.Init(); err != nil {
 		log.Errorf("import: %s", err.Error())
@@ -273,7 +276,7 @@ func (imp *Import) Cancel() {
 }
 
 // DestinationFilename returns the destination filename of a MediaFile to be imported.
-func (imp *Import) DestinationFilename(mainFile *MediaFile, mediaFile *MediaFile) (string, error) {
+func (imp *Import) DestinationFilename(mainFile *MediaFile, mediaFile *MediaFile, folder string) (string, error) {
 	fileName := mainFile.CanonicalName()
 	fileExtension := mediaFile.Extension()
 	dateCreated := mainFile.DateCreated()
@@ -289,11 +292,9 @@ func (imp *Import) DestinationFilename(mainFile *MediaFile, mediaFile *MediaFile
 		}
 	}
 
-	//	Mon Jan 2 15:04:05 -0700 MST 2006
-	pathName := filepath.Join(imp.originalsPath(), dateCreated.Format("2006/01"))
-
+	// Find and return available filename.
 	iteration := 0
-
+	pathName := filepath.Join(imp.originalsPath(), folder, dateCreated.Format("2006/01"))
 	result := filepath.Join(pathName, fileName+fileExtension)
 
 	for fs.FileExists(result) {

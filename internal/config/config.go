@@ -22,6 +22,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
+	"github.com/photoprism/photoprism/internal/customize"
 	"github.com/photoprism/photoprism/internal/entity"
 	"github.com/photoprism/photoprism/internal/event"
 	"github.com/photoprism/photoprism/internal/face"
@@ -43,9 +44,10 @@ var TotalMem uint64
 // Config holds database, cache and all parameters of photoprism
 type Config struct {
 	once     sync.Once
-	db       *gorm.DB
+	cliCtx   *cli.Context
 	options  *Options
-	settings *Settings
+	settings *customize.Settings
+	db       *gorm.DB
 	hub      *hub.Config
 	token    string
 	serial   string
@@ -96,6 +98,7 @@ func NewConfig(ctx *cli.Context) *Config {
 
 	// Initialize options from config file and CLI context.
 	c := &Config{
+		cliCtx:  ctx,
 		options: NewOptions(ctx),
 		token:   rnd.GenerateToken(8),
 		env:     os.Getenv("DOCKER_ENV"),
@@ -110,14 +113,7 @@ func NewConfig(ctx *cli.Context) *Config {
 		}
 	}
 
-	// Initialize package extensions.
-	for _, ext := range Extensions() {
-		if err := ext.init(c); err != nil {
-			log.Warnf("config: failed to initialize extension %s (%s)", clean.Log(ext.name), err)
-		} else {
-			log.Debugf("config: extension %s initialized", clean.Log(ext.name))
-		}
-	}
+	Ext().Init(c)
 
 	return c
 }
@@ -125,6 +121,24 @@ func NewConfig(ctx *cli.Context) *Config {
 // Unsafe checks if unsafe settings are allowed.
 func (c *Config) Unsafe() bool {
 	return c.options.Unsafe
+}
+
+// CliContext returns the cli context if set.
+func (c *Config) CliContext() *cli.Context {
+	if c.cliCtx == nil {
+		log.Warnf("config: cli context not set - possible bug")
+	}
+
+	return c.cliCtx
+}
+
+// CliGlobalString returns a global cli string flag value if set.
+func (c *Config) CliGlobalString(name string) string {
+	if c.cliCtx == nil {
+		return ""
+	}
+
+	return c.cliCtx.GlobalString(name)
 }
 
 // Options returns the raw config options.
@@ -151,6 +165,11 @@ func (c *Config) Propagate() {
 	// Set geocoding parameters.
 	places.UserAgent = c.UserAgent()
 	entity.GeoApi = c.GeoApi()
+
+	// Set API preview and download default tokens.
+	entity.PreviewToken.Set(c.PreviewToken(), entity.TokenConfig)
+	entity.DownloadToken.Set(c.DownloadToken(), entity.TokenConfig)
+	entity.CheckTokens = !c.Public()
 
 	// Set face recognition parameters.
 	face.ScoreThreshold = c.FaceScore()
@@ -265,11 +284,11 @@ func (c *Config) initSerial() (err error) {
 	storageName := filepath.Join(c.StoragePath(), serialName)
 	backupName := filepath.Join(c.BackupPath(), serialName)
 
-	if err = os.WriteFile(storageName, []byte(c.serial), os.ModePerm); err != nil {
+	if err = os.WriteFile(storageName, []byte(c.serial), fs.ModeFile); err != nil {
 		return fmt.Errorf("could not create %s: %s", storageName, err)
 	}
 
-	if err = os.WriteFile(backupName, []byte(c.serial), os.ModePerm); err != nil {
+	if err = os.WriteFile(backupName, []byte(c.serial), fs.ModeFile); err != nil {
 		return fmt.Errorf("could not create %s: %s", backupName, err)
 	}
 
@@ -372,13 +391,22 @@ func (c *Config) StaticUri() string {
 	return c.CdnUrl(c.BaseUri(StaticUri))
 }
 
-// SiteUrl returns the public server URL (default is "http://localhost:2342/").
+// SiteUrl returns the public server URL (default is "http://photoprism.me:2342/").
 func (c *Config) SiteUrl() string {
 	if c.options.SiteUrl == "" {
-		return "http://localhost:2342/"
+		return "http://photoprism.me:2342/"
 	}
 
 	return strings.TrimRight(c.options.SiteUrl, "/") + "/"
+}
+
+// SiteHttps checks if the site URL uses HTTPS.
+func (c *Config) SiteHttps() bool {
+	if c.options.SiteUrl == "" {
+		return false
+	}
+
+	return strings.HasPrefix(c.options.SiteUrl, "https://")
 }
 
 // SiteDomain returns the public server domain.
@@ -427,22 +455,32 @@ func (c *Config) SitePreview() string {
 	return c.options.SitePreview
 }
 
-// Imprint returns the legal info text for the page footer.
-func (c *Config) Imprint() string {
+// LegalInfo returns the legal info text for the page footer.
+func (c *Config) LegalInfo() string {
 	if c.NoSponsor() {
 		return MsgSponsor
 	}
 
-	return c.options.Imprint
+	if s := c.CliGlobalString("imprint"); s != "" {
+		log.Warnf("config: option 'imprint' is deprecated, please use 'legal-info'")
+		return s
+	}
+
+	return c.options.LegalInfo
 }
 
-// ImprintUrl returns the legal info url.
-func (c *Config) ImprintUrl() string {
+// LegalUrl returns the legal info url.
+func (c *Config) LegalUrl() string {
 	if c.NoSponsor() {
 		return SignUpURL
 	}
 
-	return c.options.ImprintUrl
+	if s := c.CliGlobalString("imprint-url"); s != "" {
+		log.Warnf("config: option 'imprint-url' is deprecated, please use 'legal-url'")
+		return s
+	}
+
+	return c.options.LegalUrl
 }
 
 // Prod checks if production mode is enabled, hides non-essential log messages.
@@ -541,12 +579,7 @@ func (c *Config) SetLogLevel(level logrus.Level) {
 
 // Shutdown services and workers.
 func (c *Config) Shutdown() {
-	mutex.People.Cancel()
-	mutex.MainWorker.Cancel()
-	mutex.ShareWorker.Cancel()
-	mutex.SyncWorker.Cancel()
-	mutex.MetaWorker.Cancel()
-	mutex.FacesWorker.Cancel()
+	mutex.CancelAll()
 
 	if err := c.CloseDb(); err != nil {
 		log.Errorf("could not close database connection: %s", err)
@@ -670,7 +703,7 @@ func (c *Config) OriginalsLimitBytes() int64 {
 // ResolutionLimit returns the maximum resolution of originals in megapixels (width x height).
 func (c *Config) ResolutionLimit() int {
 	if c.NoSponsor() {
-		return 100
+		return DefaultResolutionLimit
 	}
 
 	result := c.options.ResolutionLimit

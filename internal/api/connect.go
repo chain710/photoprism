@@ -7,8 +7,8 @@ import (
 
 	"github.com/photoprism/photoprism/internal/acl"
 	"github.com/photoprism/photoprism/internal/form"
+	"github.com/photoprism/photoprism/internal/get"
 	"github.com/photoprism/photoprism/internal/i18n"
-	"github.com/photoprism/photoprism/internal/service"
 	"github.com/photoprism/photoprism/pkg/clean"
 )
 
@@ -17,7 +17,7 @@ import (
 // PUT /api/v1/connect/:name
 func Connect(router *gin.RouterGroup) {
 	router.PUT("/connect/:name", func(c *gin.Context) {
-		name := clean.IdString(c.Param("name"))
+		name := clean.ID(c.Param("name"))
 
 		if name == "" {
 			log.Errorf("connect: empty service name")
@@ -39,18 +39,18 @@ func Connect(router *gin.RouterGroup) {
 			return
 		}
 
-		conf := service.Config()
+		conf := get.Config()
 
 		if conf.Public() {
 			Abort(c, http.StatusForbidden, i18n.ErrPublic)
 			return
 		}
 
-		s := Auth(SessionID(c), acl.ResourceConfigOptions, acl.ActionUpdate)
+		s := Auth(c, acl.ResourceConfig, acl.ActionUpdate)
 
 		if s.Invalid() {
-			log.Errorf("connect: %s not authorized", clean.Log(s.User.UserName))
-			AbortUnauthorized(c)
+			log.Errorf("connect: %s not authorized", clean.Log(s.User().UserName))
+			AbortForbidden(c)
 			return
 		}
 

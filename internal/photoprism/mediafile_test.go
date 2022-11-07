@@ -870,8 +870,10 @@ func TestMediaFile_MimeType(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		assert.Equal(t, "image/tiff", mediaFile.MimeType())
 
+		assert.Equal(t, "image/dng", mediaFile.MimeType())
+		assert.True(t, mediaFile.IsDNG())
+		assert.True(t, mediaFile.IsRaw())
 	})
 
 	t.Run("iphone_7.xmp", func(t *testing.T) {
@@ -879,7 +881,7 @@ func TestMediaFile_MimeType(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		assert.Equal(t, "", mediaFile.MimeType())
+		assert.Equal(t, "text/plain", mediaFile.MimeType())
 	})
 
 	t.Run("iphone_7.json", func(t *testing.T) {
@@ -887,23 +889,30 @@ func TestMediaFile_MimeType(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		assert.Equal(t, "", mediaFile.MimeType())
+		assert.Equal(t, "application/json", mediaFile.MimeType())
 	})
-
+	t.Run("fox.profile0.8bpc.yuv420.avif", func(t *testing.T) {
+		mediaFile, err := NewMediaFile(conf.ExamplesPath() + "/fox.profile0.8bpc.yuv420.avif")
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Equal(t, fs.MimeTypeAVIF, mediaFile.MimeType())
+		assert.True(t, mediaFile.IsAVIF())
+	})
 	t.Run("iphone_7.heic", func(t *testing.T) {
 		mediaFile, err := NewMediaFile(conf.ExamplesPath() + "/iphone_7.heic")
 		if err != nil {
 			t.Fatal(err)
 		}
-		assert.Equal(t, "image/heif", mediaFile.MimeType())
+		assert.Equal(t, fs.MimeTypeHEIC, mediaFile.MimeType())
+		assert.True(t, mediaFile.IsHEIC())
 	})
-
 	t.Run("IMG_4120.AAE", func(t *testing.T) {
 		mediaFile, err := NewMediaFile(conf.ExamplesPath() + "/IMG_4120.AAE")
 		if err != nil {
 			t.Fatal(err)
 		}
-		assert.Equal(t, "", mediaFile.MimeType())
+		assert.Equal(t, fs.MimeTypeXML, mediaFile.MimeType())
 	})
 
 	t.Run("earth.mov", func(t *testing.T) {
@@ -961,7 +970,7 @@ func TestMediaFile_Move(t *testing.T) {
 	origName := tmpPath + "/original.jpg"
 	destName := tmpPath + "/destination.jpg"
 
-	if err := os.MkdirAll(tmpPath, os.ModePerm); err != nil {
+	if err := os.MkdirAll(tmpPath, fs.ModeDir); err != nil {
 		t.Fatal(err)
 	}
 
@@ -997,7 +1006,7 @@ func TestMediaFile_Copy(t *testing.T) {
 
 	tmpPath := conf.CachePath() + "/_tmp/TestMediaFile_Copy"
 
-	if err := os.MkdirAll(tmpPath, os.ModePerm); err != nil {
+	if err := os.MkdirAll(tmpPath, fs.ModeDir); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1092,12 +1101,19 @@ func TestMediaFile_HasType(t *testing.T) {
 		}
 		assert.Equal(t, false, mediaFile.HasFileType("jpg"))
 	})
+	t.Run("fox.profile0.8bpc.yuv420.avif", func(t *testing.T) {
+		mediaFile, err := NewMediaFile(conf.ExamplesPath() + "/fox.profile0.8bpc.yuv420.avif")
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Equal(t, true, mediaFile.HasFileType("avif"))
+	})
 	t.Run("iphone_7.heic", func(t *testing.T) {
 		mediaFile, err := NewMediaFile(conf.ExamplesPath() + "/iphone_7.heic")
 		if err != nil {
 			t.Fatal(err)
 		}
-		assert.Equal(t, true, mediaFile.HasFileType("heif"))
+		assert.Equal(t, true, mediaFile.HasFileType("heic"))
 	})
 	t.Run("iphone_7.xmp", func(t *testing.T) {
 		mediaFile, err := NewMediaFile(conf.ExamplesPath() + "/iphone_7.xmp")
@@ -1108,7 +1124,7 @@ func TestMediaFile_HasType(t *testing.T) {
 	})
 }
 
-func TestMediaFile_IsHEIF(t *testing.T) {
+func TestMediaFile_IsHEIC(t *testing.T) {
 	conf := config.TestConfig()
 
 	t.Run("iphone_7.json", func(t *testing.T) {
@@ -1116,28 +1132,28 @@ func TestMediaFile_IsHEIF(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		assert.Equal(t, false, mediaFile.IsHEIF())
+		assert.Equal(t, false, mediaFile.IsHEIC())
 	})
 	t.Run("iphone_7.heic", func(t *testing.T) {
 		mediaFile, err := NewMediaFile(conf.ExamplesPath() + "/iphone_7.heic")
 		if err != nil {
 			t.Fatal(err)
 		}
-		assert.Equal(t, true, mediaFile.IsHEIF())
+		assert.Equal(t, true, mediaFile.IsHEIC())
 	})
 	t.Run("canon_eos_6d.dng", func(t *testing.T) {
 		mediaFile, err := NewMediaFile(conf.ExamplesPath() + "/canon_eos_6d.dng")
 		if err != nil {
 			t.Fatal(err)
 		}
-		assert.Equal(t, false, mediaFile.IsHEIF())
+		assert.Equal(t, false, mediaFile.IsHEIC())
 	})
 	t.Run("elephants.jpg", func(t *testing.T) {
 		mediaFile, err := NewMediaFile(conf.ExamplesPath() + "/elephants.jpg")
 		if err != nil {
 			t.Fatal(err)
 		}
-		assert.Equal(t, false, mediaFile.IsHEIF())
+		assert.Equal(t, false, mediaFile.IsHEIC())
 	})
 }
 
@@ -1206,8 +1222,8 @@ func TestMediaFile_IsTiff(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		assert.Equal(t, fs.JsonFile, mediaFile.FileType())
-		assert.Equal(t, "", mediaFile.MimeType())
+		assert.Equal(t, fs.SidecarJSON, mediaFile.FileType())
+		assert.Equal(t, fs.MimeTypeJSON, mediaFile.MimeType())
 		assert.Equal(t, false, mediaFile.IsTiff())
 	})
 	t.Run("purple.tiff", func(t *testing.T) {
@@ -2343,7 +2359,7 @@ func TestMediaFile_RenameSidecarFiles(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := os.MkdirAll(filepath.Join(conf.SidecarPath(), "foo"), os.ModePerm); err != nil {
+		if err := os.MkdirAll(filepath.Join(conf.SidecarPath(), "foo"), fs.ModeDir); err != nil {
 			t.Fatal(err)
 		}
 

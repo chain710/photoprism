@@ -6,6 +6,10 @@ nav .v-list__tile__title.title {
     line-height: normal!important;
 }
 
+.v-navigation-drawer>.theme--dark.v-list .v-list__tile__sub-title {
+    color: #ffffff77;
+}
+
 #p-navigation .nav-title {
     text-align: left;
     /* font-weight: bold; */
@@ -57,7 +61,7 @@ nav .v-list__tile__title.title {
     color: white;
 }
 
-#imprint {
+#legal-info {
     position: fixed;
     bottom: 0;
     left: 50%;
@@ -70,8 +74,8 @@ nav .v-list__tile__title.title {
     border-radius: 5px 5px 0 0;
 }
 
-#imprint a,
-#imprint span {
+#legal-info a,
+#legal-info span {
     text-decoration: none;
     font-size: 12px;
     color: #000;
@@ -161,7 +165,7 @@ nav .v-list__tile__title.title {
 /* Mobile Menu */
 
 #photoprism #p-navigation .mobile-menu-trigger {
-    width: 48px;
+    width: 24px;
     padding: 0;
     margin: 0;
 }
@@ -278,7 +282,7 @@ nav .v-list__tile__title.title {
     fill: rgba(255,255,255,.85);
     color: rgba(255,255,255,.85);
     display: inline-block;
-    min-width: 200px;
+    min-width: 210px;
     font-size: 15px;
     line-height: 50px;
     text-decoration: none;

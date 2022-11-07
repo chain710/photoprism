@@ -8,40 +8,52 @@ import (
 	"os/user"
 	"path/filepath"
 	"runtime"
+	"sync"
+
+	"github.com/photoprism/photoprism/pkg/rnd"
 
 	"github.com/photoprism/photoprism/pkg/clean"
 	"github.com/photoprism/photoprism/pkg/fs"
 )
 
 // binPaths stores known executable paths.
-var binPaths = make(map[string]string, 8)
-var tempPath = ""
+var (
+	binPaths = make(map[string]string, 8)
+	binMu    = sync.RWMutex{}
+	tempPath = ""
+)
 
-// findExecutable searches binaries by their name.
-func findExecutable(configBin, defaultBin string) (binPath string) {
-	// Cached?
+// findBin resolves the absolute file path of external binaries.
+func findBin(configBin, defaultBin string) (binPath string) {
 	cacheKey := defaultBin + configBin
-	if cached, ok := binPaths[cacheKey]; ok {
+	binMu.RLock()
+	cached, found := binPaths[cacheKey]
+	binMu.RUnlock()
+
+	// Already found?
+	if found {
 		return cached
 	}
 
-	// Default if config value is empty.
+	// Default binary name?
 	if configBin == "" {
 		binPath = defaultBin
 	} else {
 		binPath = configBin
 	}
 
-	// Search.
+	// Search for binary.
 	if path, err := exec.LookPath(binPath); err == nil {
 		binPath = path
 	}
 
-	// Exists?
+	// Found?
 	if !fs.FileExists(binPath) {
 		binPath = ""
 	} else {
+		binMu.Lock()
 		binPaths[cacheKey] = binPath
+		binMu.Unlock()
 	}
 
 	return binPath
@@ -67,97 +79,109 @@ func (c *Config) CreateDirectories() error {
 
 	if c.AssetsPath() == "" {
 		return notFoundError("assets")
-	} else if err := os.MkdirAll(c.AssetsPath(), os.ModePerm); err != nil {
+	} else if err := os.MkdirAll(c.AssetsPath(), fs.ModeDir); err != nil {
 		return createError(c.AssetsPath(), err)
 	}
 
 	if c.StoragePath() == "" {
 		return notFoundError("storage")
-	} else if err := os.MkdirAll(c.StoragePath(), os.ModePerm); err != nil {
+	} else if err := os.MkdirAll(c.StoragePath(), fs.ModeDir); err != nil {
 		return createError(c.StoragePath(), err)
+	}
+
+	if c.UsersPath() == "" {
+		return notFoundError("users")
+	} else if err := os.MkdirAll(c.UsersPath(), fs.ModeDir); err != nil {
+		return createError(c.UsersPath(), err)
 	}
 
 	if c.CmdCachePath() == "" {
 		return notFoundError("cmd cache")
-	} else if err := os.MkdirAll(c.CmdCachePath(), os.ModePerm); err != nil {
+	} else if err := os.MkdirAll(c.CmdCachePath(), fs.ModeDir); err != nil {
 		return createError(c.CmdCachePath(), err)
 	}
 
 	if c.BackupPath() == "" {
 		return notFoundError("backup")
-	} else if err := os.MkdirAll(c.BackupPath(), os.ModePerm); err != nil {
+	} else if err := os.MkdirAll(c.BackupPath(), fs.ModeDir); err != nil {
 		return createError(c.BackupPath(), err)
 	}
 
 	if c.OriginalsPath() == "" {
 		return notFoundError("originals")
-	} else if err := os.MkdirAll(c.OriginalsPath(), os.ModePerm); err != nil {
+	} else if err := os.MkdirAll(c.OriginalsPath(), fs.ModeDir); err != nil {
 		return createError(c.OriginalsPath(), err)
 	}
 
 	if c.ImportPath() == "" {
 		return notFoundError("import")
-	} else if err := os.MkdirAll(c.ImportPath(), os.ModePerm); err != nil {
+	} else if err := os.MkdirAll(c.ImportPath(), fs.ModeDir); err != nil {
 		return createError(c.ImportPath(), err)
 	}
 
 	if filepath.IsAbs(c.SidecarPath()) {
-		if err := os.MkdirAll(c.SidecarPath(), os.ModePerm); err != nil {
+		if err := os.MkdirAll(c.SidecarPath(), fs.ModeDir); err != nil {
 			return createError(c.SidecarPath(), err)
 		}
 	}
 
 	if c.CachePath() == "" {
 		return notFoundError("cache")
-	} else if err := os.MkdirAll(c.CachePath(), os.ModePerm); err != nil {
+	} else if err := os.MkdirAll(c.CachePath(), fs.ModeDir); err != nil {
 		return createError(c.CachePath(), err)
 	}
 
 	if c.ThumbCachePath() == "" {
 		return notFoundError("thumbs")
-	} else if err := os.MkdirAll(c.ThumbCachePath(), os.ModePerm); err != nil {
+	} else if err := os.MkdirAll(c.ThumbCachePath(), fs.ModeDir); err != nil {
 		return createError(c.ThumbCachePath(), err)
 	}
 
 	if c.ConfigPath() == "" {
 		return notFoundError("config")
-	} else if err := os.MkdirAll(c.ConfigPath(), os.ModePerm); err != nil {
+	} else if err := os.MkdirAll(c.ConfigPath(), fs.ModeDir); err != nil {
 		return createError(c.ConfigPath(), err)
+	}
+
+	if c.CertificatesPath() == "" {
+		return notFoundError("certificates")
+	} else if err := os.MkdirAll(c.CertificatesPath(), fs.ModeDir); err != nil {
+		return createError(c.CertificatesPath(), err)
 	}
 
 	if c.TempPath() == "" {
 		return notFoundError("temp")
-	} else if err := os.MkdirAll(c.TempPath(), os.ModePerm); err != nil {
+	} else if err := os.MkdirAll(c.TempPath(), fs.ModeDir); err != nil {
 		return createError(c.TempPath(), err)
 	}
 
 	if c.AlbumsPath() == "" {
 		return notFoundError("albums")
-	} else if err := os.MkdirAll(c.AlbumsPath(), os.ModePerm); err != nil {
+	} else if err := os.MkdirAll(c.AlbumsPath(), fs.ModeDir); err != nil {
 		return createError(c.AlbumsPath(), err)
 	}
 
 	if c.TensorFlowModelPath() == "" {
 		return notFoundError("tensorflow model")
-	} else if err := os.MkdirAll(c.TensorFlowModelPath(), os.ModePerm); err != nil {
+	} else if err := os.MkdirAll(c.TensorFlowModelPath(), fs.ModeDir); err != nil {
 		return createError(c.TensorFlowModelPath(), err)
 	}
 
 	if c.BuildPath() == "" {
 		return notFoundError("build")
-	} else if err := os.MkdirAll(c.BuildPath(), os.ModePerm); err != nil {
+	} else if err := os.MkdirAll(c.BuildPath(), fs.ModeDir); err != nil {
 		return createError(c.BuildPath(), err)
 	}
 
 	if filepath.Dir(c.PIDFilename()) == "" {
 		return notFoundError("pid file")
-	} else if err := os.MkdirAll(filepath.Dir(c.PIDFilename()), os.ModePerm); err != nil {
+	} else if err := os.MkdirAll(filepath.Dir(c.PIDFilename()), fs.ModeDir); err != nil {
 		return createError(filepath.Dir(c.PIDFilename()), err)
 	}
 
 	if filepath.Dir(c.LogFilename()) == "" {
 		return notFoundError("log file")
-	} else if err := os.MkdirAll(filepath.Dir(c.LogFilename()), os.ModePerm); err != nil {
+	} else if err := os.MkdirAll(filepath.Dir(c.LogFilename()), fs.ModeDir); err != nil {
 		return createError(filepath.Dir(c.LogFilename()), err)
 	}
 
@@ -256,6 +280,11 @@ func (c *Config) ImportPath() string {
 	return fs.Abs(c.options.ImportPath)
 }
 
+// ImportDest returns the relative originals path to which the files should be imported by default.
+func (c *Config) ImportDest() string {
+	return clean.UserPath(c.options.ImportDest)
+}
+
 // SidecarPath returns the storage path for generated sidecar files (relative or absolute).
 func (c *Config) SidecarPath() string {
 	if c.options.SidecarPath == "" {
@@ -273,6 +302,47 @@ func (c *Config) SidecarPathIsAbs() bool {
 // SidecarWritable checks if sidecar files can be created.
 func (c *Config) SidecarWritable() bool {
 	return !c.ReadOnly() || c.SidecarPathIsAbs()
+}
+
+// UsersPath returns the storage base path for user assets like
+// avatar images and other media that should not be indexed.
+func (c *Config) UsersPath() string {
+	// Set default.
+	if c.options.UsersPath == "" {
+		c.options.UsersPath = filepath.Join(c.StoragePath(), "users")
+	}
+
+	return c.options.UsersPath
+}
+
+// UserPath returns the storage path for user assets.
+func (c *Config) UserPath(userUid string) string {
+	if !rnd.IsUID(userUid, 0) {
+		return ""
+	}
+
+	dir := filepath.Join(c.UsersPath(), userUid)
+
+	if err := os.MkdirAll(dir, fs.ModeDir); err != nil {
+		return ""
+	}
+
+	return dir
+}
+
+// UserUploadPath returns the upload path for the specified user.
+func (c *Config) UserUploadPath(userUid, token string) (string, error) {
+	if !rnd.IsUID(userUid, 0) {
+		return "", fmt.Errorf("invalid uid")
+	}
+
+	dir := filepath.Join(c.UserPath(userUid), "upload", clean.Token(token))
+
+	if err := os.MkdirAll(dir, fs.ModeDir); err != nil {
+		return "", err
+	}
+
+	return dir, nil
 }
 
 // TempPath returns the cached temporary directory name e.g. for uploads and downloads.
@@ -307,7 +377,7 @@ func (c *Config) tempPath() string {
 	if c.options.TempPath != "" {
 		if dir := fs.Abs(c.options.TempPath); dir == "" {
 			// Ignore.
-		} else if err := os.MkdirAll(dir, os.ModePerm); err != nil {
+		} else if err := os.MkdirAll(dir, fs.ModeDir); err != nil {
 			// Ignore.
 		} else if fs.PathWritable(dir) {
 			return dir
@@ -317,7 +387,7 @@ func (c *Config) tempPath() string {
 	// Find alternative temp path based on storage serial checksum.
 	if dir := filepath.Join(osTempDir, "photoprism_"+c.SerialChecksum()); dir == "" {
 		// Ignore.
-	} else if err := os.MkdirAll(dir, os.ModePerm); err != nil {
+	} else if err := os.MkdirAll(dir, fs.ModeDir); err != nil {
 		// Ignore.
 	} else if fs.PathWritable(dir) {
 		return dir
@@ -326,7 +396,7 @@ func (c *Config) tempPath() string {
 	// Find alternative temp path based on built-in TempDir() function.
 	if dir, err := ioutil.TempDir(osTempDir, "photoprism_"); err != nil || dir == "" {
 		// Ignore.
-	} else if err = os.MkdirAll(dir, os.ModePerm); err != nil {
+	} else if err = os.MkdirAll(dir, fs.ModeDir); err != nil {
 		// Ignore.
 	} else if fs.PathWritable(dir) {
 		return dir
@@ -344,9 +414,18 @@ func (c *Config) CachePath() string {
 	return fs.Abs(c.options.CachePath)
 }
 
-// CmdCachePath returns a path that CLI commands can use as cache directory.
+// CmdCachePath returns a path that external CLI tools can use as cache directory.
 func (c *Config) CmdCachePath() string {
 	return filepath.Join(c.CachePath(), "cmd")
+}
+
+// CmdLibPath returns the dynamic loader path that external CLI tools should use.
+func (c *Config) CmdLibPath() string {
+	if dir := os.Getenv("LD_LIBRARY_PATH"); dir != "" {
+		return dir
+	}
+
+	return "/usr/local/lib:/usr/lib"
 }
 
 // ThumbCachePath returns the thumbnail storage directory.
@@ -424,6 +503,35 @@ func (c *Config) CustomAssetsPath() string {
 	return ""
 }
 
+// CustomStaticPath returns the custom static assets' path.
+func (c *Config) CustomStaticPath() string {
+	if dir := c.CustomAssetsPath(); dir == "" {
+		return ""
+	} else if dir = filepath.Join(dir, "static"); !fs.PathExists(dir) {
+		return ""
+	} else {
+		return dir
+	}
+}
+
+// CustomStaticFile returns the path to a custom static file.
+func (c *Config) CustomStaticFile(fileName string) string {
+	if dir := c.CustomStaticPath(); dir == "" {
+		return ""
+	} else {
+		return filepath.Join(dir, fileName)
+	}
+}
+
+// CustomStaticUri returns the URI to a custom static resource.
+func (c *Config) CustomStaticUri() string {
+	if dir := c.CustomAssetsPath(); dir == "" {
+		return ""
+	} else {
+		return c.CdnUrl(c.BaseUri(CustomStaticUri))
+	}
+}
+
 // LocalesPath returns the translation locales path.
 func (c *Config) LocalesPath() string {
 	return filepath.Join(c.AssetsPath(), "locales")
@@ -441,17 +549,17 @@ func (c *Config) TestdataPath() string {
 
 // MysqlBin returns the mysql executable file name.
 func (c *Config) MysqlBin() string {
-	return findExecutable("", "mysql")
+	return findBin("", "mysql")
 }
 
 // MysqldumpBin returns the mysqldump executable file name.
 func (c *Config) MysqldumpBin() string {
-	return findExecutable("", "mysqldump")
+	return findBin("", "mysqldump")
 }
 
 // SqliteBin returns the sqlite executable file name.
 func (c *Config) SqliteBin() string {
-	return findExecutable("", "sqlite3")
+	return findBin("", "sqlite3")
 }
 
 // AlbumsPath returns the storage path for album YAML files.

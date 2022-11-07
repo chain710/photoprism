@@ -14,8 +14,8 @@ import (
 	"github.com/jinzhu/gorm"
 	"github.com/ulule/deepcopier"
 
+	"github.com/photoprism/photoprism/internal/customize"
 	"github.com/photoprism/photoprism/internal/face"
-
 	"github.com/photoprism/photoprism/pkg/clean"
 	"github.com/photoprism/photoprism/pkg/colors"
 	"github.com/photoprism/photoprism/pkg/fs"
@@ -25,13 +25,8 @@ import (
 	"github.com/photoprism/photoprism/pkg/txt"
 )
 
-type DownloadName string
-
 const (
-	DownloadNameFile     DownloadName = "file"
-	DownloadNameOriginal DownloadName = "original"
-	DownloadNameShare    DownloadName = "share"
-	DownloadNameDefault               = DownloadNameFile
+	FileUID = byte('f')
 )
 
 // Files represents a file result set.
@@ -48,12 +43,12 @@ type File struct {
 	PhotoID          uint          `gorm:"index:idx_files_photo_id;" json:"-" yaml:"-"`
 	PhotoUID         string        `gorm:"type:VARBINARY(42);index;" json:"PhotoUID" yaml:"PhotoUID"`
 	PhotoTakenAt     time.Time     `gorm:"type:DATETIME;index;" json:"TakenAt" yaml:"TakenAt"`
-	TimeIndex        *string       `gorm:"type:VARBINARY(48);" json:"TimeIndex" yaml:"TimeIndex"`
+	TimeIndex        *string       `gorm:"type:VARBINARY(64);" json:"TimeIndex" yaml:"TimeIndex"`
 	MediaID          *string       `gorm:"type:VARBINARY(32);" json:"MediaID" yaml:"MediaID"`
 	MediaUTC         int64         `gorm:"column:media_utc;index;"  json:"MediaUTC" yaml:"MediaUTC,omitempty"`
-	InstanceID       string        `gorm:"type:VARBINARY(42);index;" json:"InstanceID,omitempty" yaml:"InstanceID,omitempty"`
+	InstanceID       string        `gorm:"type:VARBINARY(64);index;" json:"InstanceID,omitempty" yaml:"InstanceID,omitempty"`
 	FileUID          string        `gorm:"type:VARBINARY(42);unique_index;" json:"UID" yaml:"UID"`
-	FileName         string        `gorm:"type:VARBINARY(755);unique_index:idx_files_name_root;" json:"Name" yaml:"Name"`
+	FileName         string        `gorm:"type:VARBINARY(1024);unique_index:idx_files_name_root;" json:"Name" yaml:"Name"`
 	FileRoot         string        `gorm:"type:VARBINARY(16);default:'/';unique_index:idx_files_name_root;" json:"Root" yaml:"Root,omitempty"`
 	OriginalName     string        `gorm:"type:VARBINARY(755);" json:"OriginalName" yaml:"OriginalName,omitempty"`
 	FileHash         string        `gorm:"type:VARBINARY(128);index" json:"Hash" yaml:"Hash,omitempty"`
@@ -90,13 +85,14 @@ type File struct {
 	CreatedIn        int64         `json:"CreatedIn" yaml:"-"`
 	UpdatedAt        time.Time     `json:"UpdatedAt" yaml:"-"`
 	UpdatedIn        int64         `json:"UpdatedIn" yaml:"-"`
+	PublishedAt      *time.Time    `sql:"index" json:"PublishedAt,omitempty" yaml:"PublishedAt,omitempty"`
 	DeletedAt        *time.Time    `sql:"index" json:"DeletedAt,omitempty" yaml:"-"`
 	Share            []FileShare   `json:"-" yaml:"-"`
 	Sync             []FileSync    `json:"-" yaml:"-"`
 	markers          *Markers
 }
 
-// TableName returns the entity database table name.
+// TableName returns the entity table name.
 func (File) TableName() string {
 	return "files"
 }
@@ -181,10 +177,10 @@ func FirstFileByHash(fileHash string) (File, error) {
 }
 
 // PrimaryFile returns the primary file for a photo uid.
-func PrimaryFile(photoUID string) (*File, error) {
+func PrimaryFile(photoUid string) (*File, error) {
 	file := File{}
 
-	res := Db().Unscoped().First(&file, "file_primary = 1 AND photo_uid = ?", photoUID)
+	res := Db().Unscoped().First(&file, "file_primary = 1 AND photo_uid = ?", photoUid)
 
 	return &file, res.Error
 }
@@ -202,19 +198,19 @@ func (m *File) BeforeCreate(scope *gorm.Scope) error {
 	}
 
 	// Return if uid exists.
-	if rnd.ValidID(m.FileUID, 'f') {
+	if rnd.IsUnique(m.FileUID, FileUID) {
 		return nil
 	}
 
-	return scope.SetColumn("FileUID", rnd.GenerateUID('f'))
+	return scope.SetColumn("FileUID", rnd.GenerateUID(FileUID))
 }
 
 // DownloadName returns the download file name.
-func (m *File) DownloadName(n DownloadName, seq int) string {
+func (m *File) DownloadName(n customize.DownloadName, seq int) string {
 	switch n {
-	case DownloadNameFile:
+	case customize.DownloadNameFile:
 		return m.Base(seq)
-	case DownloadNameOriginal:
+	case customize.DownloadNameOriginal:
 		return m.OriginalBase(seq)
 	default:
 		return m.ShareBase(seq)
@@ -442,7 +438,7 @@ func (m *File) ResolvePrimary() (err error) {
 	return err
 }
 
-// Save stores the file in the database.
+// Save updates the record in the database or inserts a new record if it does not already exist.
 func (m *File) Save() error {
 	if m.PhotoID == 0 {
 		return fmt.Errorf("file %s: cannot save file with empty photo id", m.FileUID)
@@ -727,14 +723,14 @@ func (m *File) AddFaces(faces face.Faces) {
 }
 
 // AddFace adds a face marker to the file.
-func (m *File) AddFace(f face.Face, subjUID string) {
+func (m *File) AddFace(f face.Face, subjUid string) {
 	// Only add faces with exactly one embedding so that they can be compared and clustered.
 	if !f.Embeddings.One() {
 		return
 	}
 
 	// Create new marker from face.
-	marker := NewFaceMarker(f, *m, subjUID)
+	marker := NewFaceMarker(f, *m, subjUid)
 
 	// Failed creating new marker?
 	if marker == nil {

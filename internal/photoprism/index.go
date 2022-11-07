@@ -39,7 +39,7 @@ type Index struct {
 // NewIndex returns a new indexer and expects its dependencies as arguments.
 func NewIndex(conf *config.Config, tensorFlow *classify.TensorFlow, nsfwDetector *nsfw.Detector, faceNet *face.Net, convert *Convert, files *Files, photos *Photos) *Index {
 	if conf == nil {
-		log.Errorf("index: config is nil")
+		log.Errorf("index: config is not set")
 		return nil
 	}
 
@@ -82,7 +82,7 @@ func (ind *Index) Start(o IndexOptions) fs.Done {
 	done := make(fs.Done)
 
 	if ind.conf == nil {
-		log.Errorf("index: config is nil")
+		log.Errorf("index: config is not set")
 		return done
 	}
 
@@ -187,7 +187,15 @@ func (ind *Index) Start(o IndexOptions) fs.Done {
 				return nil
 			}
 
-			mf, err := NewMediaFile(fileName)
+			var mf *MediaFile
+			var err error
+			if isSymlink {
+				mf, err = NewMediaFile(fileName)
+			} else {
+				// If the file found while scanning is not a symlink we can
+				// skip resolving the fileName, which is resource intensive.
+				mf, err = NewMediaFileSkipResolve(fileName, fileName)
+			}
 
 			// Check if file exists and is not empty.
 			if err != nil {
@@ -197,14 +205,14 @@ func (ind *Index) Start(o IndexOptions) fs.Done {
 				return nil
 			}
 
-			// Ignore RAW images?
-			if mf.IsRaw() && skipRaw {
-				log.Infof("index: skipped raw %s", clean.Log(mf.RootRelName()))
+			// Skip already indexed?
+			if ind.files.Indexed(relName, entity.RootOriginals, mf.modTime, o.Rescan) {
 				return nil
 			}
 
-			// Skip?
-			if ind.files.Indexed(relName, entity.RootOriginals, mf.modTime, o.Rescan) {
+			// Skip RAW image?
+			if mf.IsRaw() && skipRaw {
+				log.Infof("index: skipped raw %s", clean.Log(mf.RootRelName()))
 				return nil
 			}
 
