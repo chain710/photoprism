@@ -206,6 +206,7 @@ config.update().finally(() => {
       if (isPublic || session.isUser()) {
         next();
       } else {
+        console.log(`session is `, session);
         next({
           name: "login",
           params: { nextUrl: to.fullPath },

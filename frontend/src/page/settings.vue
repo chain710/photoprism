@@ -57,6 +57,7 @@ export default {
   data() {
     const isDemo = this.$config.isDemo();
     const isPublic = this.$config.isPublic();
+    const isSingleUser = this.$config.isSingleUser();
 
     const tabs = [
       {
@@ -70,6 +71,7 @@ export default {
         'admin': true,
         'demo': true,
         'show': config.feature('settings'),
+        'singleUser': true,
       },
       {
         'name': 'settings_media',
@@ -82,6 +84,7 @@ export default {
         'admin': true,
         'demo': true,
         'show': config.allow("config", "manage"),
+        'singleUser': true,
       },
       {
         'name': 'settings_advanced',
@@ -94,6 +97,7 @@ export default {
         'admin': true,
         'demo': true,
         'show': config.allow("config", "manage"),
+        'singleUser': true,
       },
       {
         'name': 'settings_services',
@@ -106,6 +110,7 @@ export default {
         'admin': true,
         'demo': true,
         'show': config.feature('services') && config.allow("services", "manage"),
+        'singleUser': true,
       },
       {
         'name': 'settings_account',
@@ -118,6 +123,7 @@ export default {
         'admin': true,
         'demo': true,
         'show': config.feature('account'),
+        'singleUser': false,
       },
     ];
 
@@ -125,6 +131,8 @@ export default {
       initTabs("demo", tabs);
     } else if (isPublic) {
       initTabs("public", tabs);
+    } else if (isSingleUser) {
+      initTabs("singleUser", tabs);
     } else {
       initTabs("show", tabs);
     }
