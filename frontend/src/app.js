@@ -60,7 +60,7 @@ config.update().finally(() => {
   // Initialize libs and framework.
   config.progress(66);
   const viewer = new Viewer();
-  const authRequired = config.isAuthRequired();
+  const isPublic = config.isPublic();
   const isMobile =
     /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
     (navigator.maxTouchPoints && navigator.maxTouchPoints > 2);
@@ -194,7 +194,7 @@ config.update().finally(() => {
     ) {
       next({ name: "home" });
     } else if (to.matched.some((record) => record.meta.admin)) {
-      if (!authRequired || session.isAdmin()) {
+      if (isPublic || session.isAdmin()) {
         next();
       } else {
         next({
@@ -203,7 +203,7 @@ config.update().finally(() => {
         });
       }
     } else if (to.matched.some((record) => record.meta.auth)) {
-      if (!authRequired || session.isUser()) {
+      if (isPublic || session.isUser()) {
         next();
       } else {
         console.log(`session is `, session);

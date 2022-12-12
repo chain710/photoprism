@@ -141,6 +141,19 @@ export default {
       return this.loading || this.username.trim() === "" || this.password.trim() === "";
     }
   },
+  mounted() {
+    if (!this.$config.isAuthRequired()) {
+      console.log(`mount, empty login`);
+      this.loading = true;
+      this.$session.login('', '').then(
+        () => {
+          this.load();
+        }
+      ).catch(() => this.loading = false);
+    } else {
+      console.log(`mount, real login`);
+    }
+  },
   created() {
     this.$scrollbar.hide(this.$isMobile);
   },
