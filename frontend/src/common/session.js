@@ -224,7 +224,7 @@ export default class Session {
   }
 
   loginRequired() {
-    return !this.config.isPublic() && !this.isUser();
+    return !this.config.isSingleUser() && !this.config.isPublic() && !this.isUser();
   }
 
   isUser() {
