@@ -79,12 +79,10 @@ elif [[ $4 ]]; then
 
     docker buildx build \
       --platform $2 \
-      --pull \
-      --no-cache \
       --build-arg BUILD_TAG=$BUILD_DATE-$3 \
       -f docker/${1/-//}$4/Dockerfile \
-      -t photoprism/$1:$3 \
-      -t photoprism/$1:$BUILD_DATE-$3 $5 \
+      -t chain710/$1:$3 \
+      -t chain710/$1:$BUILD_DATE-$3 $5 \
       --push .
 else
     echo "Build Tags: $3"

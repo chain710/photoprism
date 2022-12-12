@@ -14,8 +14,8 @@ ARG BUILD_TAG
 WORKDIR "/go/src/github.com/photoprism/photoprism"
 COPY . .
 
-# Build app.
-RUN make all install DESTDIR=/opt/photoprism
+# build and install dist files for prod env
+RUN npm config set registry https://registry.npmmirror.com && go env -w GOPROXY=https://goproxy.cn,direct && make all install DESTDIR=/opt/photoprism
 
 ################################################## PRODUCTION STAGE ####################################################
 #### Base Image: Debian 11 (Bullseye)
