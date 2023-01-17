@@ -778,5 +778,11 @@ var Flags = CliFlags{
 			Usage:  "server log `FILE` *daemon-mode only*",
 			Value:  "",
 			EnvVar: EnvVar("LOG_FILENAME"),
+		}}, {
+		Flag: cli.StringFlag{
+			Name:   "proxy-auth-header",
+			Usage:  "proxy auth http header name",
+			Value:  "",
+			EnvVar: EnvVar("PROXY_AUTH_HEADER"),
 		}},
 }

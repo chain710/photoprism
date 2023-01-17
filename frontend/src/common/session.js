@@ -323,6 +323,18 @@ export default class Session {
     this.sendClientInfo();
   }
 
+  get() {
+    return Api.get("session").then((resp) => {
+      if (!resp.data.id) {
+        return;
+      }
+      const reload = this.config.getLanguage() !== resp.data?.config?.settings?.ui?.language;
+      this.setResp(resp);
+      this.onLogin();
+      return Promise.resolve(reload);
+    });
+  }
+
   refresh() {
     // Refresh session information.
     if (this.config.isPublic()) {
