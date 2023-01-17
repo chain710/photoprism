@@ -240,3 +240,7 @@ func (c *Config) BuildPath() string {
 func (c *Config) ImgPath() string {
 	return filepath.Join(c.StaticPath(), "img")
 }
+
+func (c *Config) ProxyAuthHeader() string {
+	return c.options.ProxyAuthHeader
+}

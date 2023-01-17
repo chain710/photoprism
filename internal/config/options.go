@@ -167,6 +167,7 @@ type Options struct {
 	PIDFilename           string        `yaml:"PIDFilename" json:"-" flag:"pid-filename"`
 	LogFilename           string        `yaml:"LogFilename" json:"-" flag:"log-filename"`
 	DetachServer          bool          `yaml:"DetachServer" json:"-" flag:"detach-server"`
+	ProxyAuthHeader       string        `yaml:"ProxyAuthHeader" json:"ProxyAuthHeader" flag:"proxy-auth-header"`
 }
 
 // NewOptions creates a new configuration entity by using two methods:

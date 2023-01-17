@@ -108,6 +108,13 @@ export default {
       return this.loading || this.username.trim() === "" || this.password.trim() === "";
     }
   },
+  mounted() {
+    this.$session.get().then(() => {
+      if (this.$session.getId()) {
+        this.load();
+      }
+    }).catch(() => {});
+  },
   created() {
     this.$scrollbar.hide(this.$isMobile);
   },
