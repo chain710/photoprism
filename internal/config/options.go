@@ -146,6 +146,7 @@ type Options struct {
 	FaceMatchDist         float64       `yaml:"-" json:"-" flag:"face-match-dist"`
 	PIDFilename           string        `yaml:"PIDFilename" json:"-" flag:"pid-filename"`
 	LogFilename           string        `yaml:"LogFilename" json:"-" flag:"log-filename"`
+	ProxyAuthHeader       string        `yaml:"ProxyAuthHeader" json:"ProxyAuthHeader" flag:"proxy-auth-header"`
 }
 
 // NewOptions creates a new configuration entity by using two methods:

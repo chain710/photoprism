@@ -685,5 +685,11 @@ var Flags = CliFlags{
 			Usage:  "server log `FILE` *daemon-mode only*",
 			EnvVar: "PHOTOPRISM_LOG_FILENAME",
 			Value:  "",
+		}}, {
+		Flag: cli.StringFlag{
+			Name:   "proxy-auth-header",
+			Usage:  "proxy auth http header name",
+			Value:  "",
+			EnvVar: "PHOTOPRISM_PROXY_AUTH_HEADER",
 		}},
 }

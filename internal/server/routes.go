@@ -29,6 +29,7 @@ func registerRoutes(router *gin.Engine, conf *config.Config) {
 		api.CreateSession(v1)
 		api.GetSession(v1)
 		api.DeleteSession(v1)
+		api.GetAnonymousSession(v1)
 
 		// Global Config.
 		api.GetConfigOptions(v1)
